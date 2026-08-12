@@ -1,4 +1,4 @@
-name: Build CyberWatch EXE
+name: Build CyberWatch EXE v2
 
 on:
   push:
@@ -21,83 +21,30 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pywebview pandas openpyxl pyinstaller
-    
-    - name: Create desktop app file
-      run: |
-        @"
-        import webview
-        import threading
-        import http.server
-        import socketserver
-        import os
-        import sys
-        import time
-        from database import Database
-        
-        # HTTP Server برای فایل‌های استاتیک
-        PORT = 8765
-        
-        class QuietHandler(http.server.SimpleHTTPRequestHandler):
-            def log_message(self, format, *args):
-                pass
-        
-        def start_server():
-            os.chdir(os.path.dirname(os.path.abspath(__file__)) if not getattr(sys, 'frozen', False) else os.path.dirname(sys.executable))
-            with socketserver.TCPServer(('127.0.0.1', PORT), QuietHandler) as httpd:
-                httpd.serve_forever()
-        
-        if __name__ == '__main__':
-            # اجرای streamlit در پس‌زمینه
-            import subprocess
-            
-            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-            app_path = os.path.join(base_dir, 'app.py')
-            
-            process = subprocess.Popen(
-                [sys.executable, '-m', 'streamlit', 'run', app_path,
-                 '--server.port', '8765',
-                 '--server.headless', 'true',
-                 '--browser.gatherUsageStats', 'false',
-                 '--global.developmentMode', 'false'],
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
-            )
-            
-            # صبر برای آماده شدن سرور
-            time.sleep(3)
-            
-            # باز کردن پنجره
-            window = webview.create_window(
-                'CyberWatch - سامانه هوشمند',
-                'http://127.0.0.1:8765',
-                width=1400,
-                height=900,
-                min_size=(1024, 700),
-                background_color='#0D1117'
-            )
-            
-            webview.start()
-            process.terminate()
-        "@ | Out-File -FilePath desktop.py -Encoding utf8
+        pip install streamlit pandas openpyxl pyinstaller
     
     - name: Build EXE with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --name "CyberWatch" `
+        pyinstaller --onefile --console --name "CyberWatch" `
           --add-data "app.py;." `
           --add-data "database.py;." `
           --add-data ".streamlit;.streamlit" `
           --hidden-import streamlit `
+          --hidden-import streamlit.web.cli `
+          --hidden-import streamlit.runtime.scriptrunner.magic_funcs `
           --hidden-import pandas `
           --hidden-import openpyxl `
-          --hidden-import webview `
+          --hidden-import sqlite3 `
           --collect-all streamlit `
           --collect-all pandas `
           --collect-all openpyxl `
-          desktop.py
+          --collect-all altair `
+          --collect-all pyarrow `
+          launcher.py
     
     - name: Upload EXE
       uses: actions/upload-artifact@v4
       with:
-        name: CyberWatch-Windows
+        name: CyberWatch-Windows-v2
         path: dist/CyberWatch.exe
         retention-days: 30
