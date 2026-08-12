@@ -1,0 +1,23 @@
+{
+    "name": "CyberWatch",
+    "image": "mcr.microsoft.com/devcontainers/python:3.11",
+    "customizations": {
+        "vscode": {
+            "extensions": ["ms-python.python"]
+        },
+        "codespaces": {
+            "openFiles": ["app.py"]
+        }
+    },
+    "forwardPorts": [8501],
+    "portsAttributes": {
+        "8501": {
+            "label": "CyberWatch",
+            "onAutoForward": "openBrowser"
+        }
+    },
+    "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt",
+    "postAttachCommand": {
+        "server": "streamlit run app.py --server.port 8501 --server.headless true --browser.gatherUsageStats false"
+    }
+}
