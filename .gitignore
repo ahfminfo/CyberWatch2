@@ -1,0 +1,16 @@
+*.db
+*.sqlite
+*.xlsx
+*.xls
+__pycache__/
+*.pyc
+env/
+venv/
+.venv/
+_temp_*
+.installed
+export.xlsx
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
