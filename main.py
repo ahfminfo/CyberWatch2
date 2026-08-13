@@ -75,19 +75,77 @@ QPushButton#navButton:checked {
 #pageHeader {
     background-color: #1F6FEB;
     border-radius: 12px;
-    padding: 20px;
+    padding: 15px 25px;
     color: white;
+    min-height: 70px;
+    max-height: 90px;
 }
 
 #pageTitle {
     color: white;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: bold;
+    padding: 2px 0;
+    background-color: transparent;
 }
 
 #pageSubtitle {
     color: #B0D4FF;
-    font-size: 12px;
+    font-size: 11px;
+    padding: 2px 0;
+    background-color: transparent;
+}
+
+QComboBox {
+    background-color: #21262D;
+    color: #E6EDF3;
+    border: 2px solid #388BFD;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    min-height: 24px;
+    selection-background-color: #1F6FEB;
+}
+
+QComboBox:hover {
+    border-color: #58A6FF;
+    background-color: #30363D;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top left;
+    width: 30px;
+    border-left: 1px solid #388BFD;
+    background-color: #1F6FEB;
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+QComboBox::down-arrow {
+    image: none;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid white;
+    width: 0;
+    height: 0;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #161B22;
+    color: #E6EDF3;
+    border: 1px solid #388BFD;
+    selection-background-color: #1F6FEB;
+    padding: 5px;
+}
+
+QComboBox QAbstractItemView::item {
+    padding: 8px;
+    min-height: 24px;
+}
+
+QComboBox QAbstractItemView::item:hover {
+    background-color: #1F3D5F;
 }
 
 #card {
