@@ -1,6 +1,7 @@
 """
-CyberWatch Desktop v7.0 - PyQt5 نسخه نهایی
+CyberWatch Desktop v8.0 - نسخه نهایی حرفه‌ای
 سامانه هوشمند جستجو و ثبت کاربران فضای مجازی
+طراحی: مایکروسافت/گوگل استایل
 """
 import sys
 import os
@@ -19,7 +20,7 @@ from database import Database
 
 YEARS_LIST = [""] + [str(y) for y in range(1399, 1416)]
 
-# لیست نهایی موضوعات (تنها - بدون +)
+# لیست نهایی موضوعات
 DEFAULT_SUBJECTS = [
     "",
     "اراذل و اوباش",
@@ -35,318 +36,387 @@ DEFAULT_SUBJECTS = [
     "کنکور",
 ]
 
-
-STYLE = """
-QMainWindow, QWidget {
-    background-color: #0D1117;
-    color: #E6EDF3;
-    font-family: 'Segoe UI', 'Tahoma', sans-serif;
+# رنگ‌های تخصیص یافته به هر موضوع
+SUBJECT_COLORS = {
+    "اراذل و اوباش": "#EF4444",
+    "اخلاقی": "#F59E0B",
+    "سلاح": "#DC2626",
+    "تشویش اذهان عمومی": "#8B5CF6",
+    "سیاسی": "#3B82F6",
+    "امنیتی": "#06B6D4",
+    "سلطنت طلب": "#EC4899",
+    "تشکیل دسته یا جمعیت با هدف بر هم زدن امنیت کشور": "#A855F7",
+    "پانجیا": "#10B981",
+    "رصد اولیه": "#14B8A6",
+    "کنکور": "#F97316",
 }
 
+
+STYLE = """
+* {
+    font-family: 'Segoe UI', 'Tahoma', 'Vazirmatn', sans-serif;
+}
+
+QMainWindow, QWidget {
+    background-color: #0F172A;
+    color: #F1F5F9;
+    font-size: 14px;
+}
+
+/* سایدبار */
 #sidebar {
-    background-color: #161B22;
-    border-right: 1px solid #21262D;
+    background-color: #1E293B;
+    border-right: 2px solid #334155;
 }
 
 #sidebarLogo {
-    color: #58A6FF;
-    font-size: 24px;
-    font-weight: bold;
-    padding: 20px;
+    color: #60A5FA;
+    font-size: 26px;
+    font-weight: 900;
+    padding: 25px;
 }
 
 #sidebarSubtitle {
-    color: #8B949E;
-    font-size: 11px;
-    padding-bottom: 20px;
+    color: #94A3B8;
+    font-size: 13px;
+    padding-bottom: 25px;
 }
 
 QPushButton#navButton {
     background-color: transparent;
-    color: #E6EDF3;
+    color: #E2E8F0;
     border: none;
     text-align: right;
-    padding: 12px 20px;
-    font-size: 13px;
-    border-radius: 8px;
-    margin: 2px 8px;
+    padding: 15px 25px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 10px;
+    margin: 4px 10px;
 }
 
 QPushButton#navButton:hover {
-    background-color: #1C2128;
+    background-color: #334155;
+    color: #60A5FA;
 }
 
 QPushButton#navButton:checked {
-    background-color: #1F6FEB;
+    background-color: #2563EB;
     color: white;
-    font-weight: bold;
+    font-weight: 700;
 }
 
+/* هدر صفحه */
 #pageHeader {
-    background-color: #1F6FEB;
-    border-radius: 12px;
-    padding: 15px 25px;
+    background-color: #2563EB;
+    border-radius: 14px;
+    padding: 18px 28px;
     color: white;
-    min-height: 70px;
-    max-height: 90px;
+    min-height: 75px;
+    max-height: 95px;
 }
 
 #pageTitle {
     color: white;
-    font-size: 20px;
-    font-weight: bold;
-    padding: 2px 0;
+    font-size: 24px;
+    font-weight: 900;
+    padding: 3px 0;
     background-color: transparent;
 }
 
 #pageSubtitle {
-    color: #B0D4FF;
-    font-size: 11px;
-    padding: 2px 0;
+    color: #DBEAFE;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 3px 0;
     background-color: transparent;
 }
 
+/* کارت‌ها */
 #card {
-    background-color: #161B22;
-    border: 1px solid #21262D;
-    border-radius: 12px;
-    padding: 15px;
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 20px;
 }
 
 #statCard {
-    background-color: #161B22;
-    border: 1px solid #30363D;
-    border-radius: 12px;
-    padding: 15px;
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 20px;
 }
 
+/* دکمه‌ها */
 QPushButton {
-    background-color: #21262D;
-    color: #E6EDF3;
-    border: 1px solid #30363D;
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-size: 13px;
-    min-height: 20px;
+    background-color: #334155;
+    color: #F1F5F9;
+    border: 1px solid #475569;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    min-height: 22px;
 }
 
 QPushButton:hover {
-    background-color: #30363D;
-    border-color: #58A6FF;
+    background-color: #475569;
+    border-color: #60A5FA;
 }
 
 QPushButton#primaryButton {
-    background-color: #1F6FEB;
+    background-color: #2563EB;
     color: white;
     border: none;
-    font-weight: bold;
+    font-weight: 700;
+    font-size: 14px;
 }
 
 QPushButton#primaryButton:hover {
-    background-color: #388BFD;
+    background-color: #1D4ED8;
 }
 
 QPushButton#successButton {
-    background-color: #238636;
+    background-color: #16A34A;
     color: white;
     border: none;
-    font-weight: bold;
+    font-weight: 700;
+    font-size: 15px;
 }
 
 QPushButton#successButton:hover {
-    background-color: #2EA043;
+    background-color: #15803D;
 }
 
 QPushButton#dangerButton {
-    background-color: #DA3633;
+    background-color: #DC2626;
     color: white;
     border: none;
-    font-weight: bold;
+    font-weight: 700;
 }
 
 QPushButton#dangerButton:hover {
-    background-color: #F85149;
+    background-color: #B91C1C;
 }
 
 QPushButton#warningButton {
-    background-color: #D29922;
+    background-color: #F59E0B;
     color: white;
     border: none;
-    font-weight: bold;
+    font-weight: 700;
 }
 
+QPushButton#warningButton:hover {
+    background-color: #D97706;
+}
+
+/* ورودی‌ها */
 QLineEdit, QTextEdit {
-    background-color: #0D1117;
-    color: #E6EDF3;
-    border: 1px solid #30363D;
-    border-radius: 6px;
-    padding: 8px;
-    font-size: 13px;
-    min-height: 20px;
+    background-color: #0F172A;
+    color: #F1F5F9;
+    border: 2px solid #334155;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    min-height: 22px;
 }
 
 QLineEdit:focus, QTextEdit:focus {
-    border-color: #58A6FF;
+    border-color: #60A5FA;
+    background-color: #1E293B;
 }
 
+/* کمبوباکس */
 QComboBox {
-    background-color: #21262D;
-    color: #E6EDF3;
-    border: 2px solid #388BFD;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 13px;
-    min-height: 24px;
-    selection-background-color: #1F6FEB;
+    background-color: #1E293B;
+    color: #F1F5F9;
+    border: 2px solid #3B82F6;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    min-height: 26px;
+    selection-background-color: #2563EB;
 }
 
 QComboBox:hover {
-    border-color: #58A6FF;
-    background-color: #30363D;
+    border-color: #60A5FA;
+    background-color: #334155;
 }
 
 QComboBox:focus {
-    border-color: #58A6FF;
+    border-color: #93C5FD;
 }
 
 QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: top left;
-    width: 30px;
-    border-left: 1px solid #388BFD;
-    background-color: #1F6FEB;
-    border-top-left-radius: 4px;
-    border-bottom-left-radius: 4px;
+    width: 32px;
+    border-left: 2px solid #3B82F6;
+    background-color: #2563EB;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
 }
 
 QComboBox::down-arrow {
     image: none;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 6px solid white;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 7px solid white;
     width: 0;
     height: 0;
 }
 
 QComboBox QAbstractItemView {
-    background-color: #161B22;
-    color: #E6EDF3;
-    border: 1px solid #388BFD;
-    selection-background-color: #1F6FEB;
-    padding: 5px;
+    background-color: #1E293B;
+    color: #F1F5F9;
+    border: 2px solid #3B82F6;
+    selection-background-color: #2563EB;
+    padding: 6px;
     outline: 0;
+    font-size: 14px;
 }
 
 QComboBox QAbstractItemView::item {
-    padding: 8px;
-    min-height: 24px;
-    border-bottom: 1px solid #21262D;
+    padding: 10px;
+    min-height: 28px;
+    border-bottom: 1px solid #334155;
+    border-radius: 4px;
 }
 
 QComboBox QAbstractItemView::item:hover {
-    background-color: #1F3D5F;
-    color: white;
+    background-color: #334155;
+    color: #60A5FA;
 }
 
 QComboBox QAbstractItemView::item:selected {
-    background-color: #1F6FEB;
+    background-color: #2563EB;
     color: white;
+    font-weight: 700;
 }
 
+/* جدول */
 QTableWidget {
-    background-color: #161B22;
-    color: #E6EDF3;
-    gridline-color: #21262D;
-    border: 1px solid #21262D;
-    border-radius: 8px;
-    selection-background-color: #1F3D5F;
+    background-color: #1E293B;
+    color: #F1F5F9;
+    gridline-color: #334155;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    selection-background-color: #1E40AF;
+    font-size: 13px;
 }
 
 QTableWidget::item {
-    padding: 8px;
+    padding: 10px;
+    font-size: 13px;
 }
 
 QTableWidget::item:selected {
-    background-color: #1F3D5F;
+    background-color: #1E40AF;
     color: white;
 }
 
 QHeaderView::section {
-    background-color: #21262D;
-    color: #8B949E;
-    padding: 10px;
+    background-color: #334155;
+    color: #60A5FA;
+    padding: 12px;
     border: none;
-    font-weight: bold;
+    font-weight: 700;
+    font-size: 13px;
 }
 
+/* لیبل‌ها */
 QLabel {
-    color: #E6EDF3;
+    color: #F1F5F9;
+    font-size: 14px;
 }
 
 QLabel#formLabel {
-    color: #8B949E;
-    font-size: 12px;
-    font-weight: bold;
+    color: #94A3B8;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 0;
 }
 
 QLabel#requiredLabel {
-    color: #D29922;
-    font-size: 12px;
-    font-weight: bold;
+    color: #F59E0B;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 0;
 }
 
+/* تب‌ها */
 QTabWidget::pane {
-    border: 1px solid #21262D;
-    border-radius: 8px;
-    background-color: #161B22;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    background-color: #1E293B;
 }
 
 QTabBar::tab {
-    background-color: #21262D;
-    color: #8B949E;
-    padding: 10px 20px;
-    margin-right: 2px;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
+    background-color: #334155;
+    color: #94A3B8;
+    padding: 12px 24px;
+    margin-right: 3px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
 }
 
 QTabBar::tab:selected {
-    background-color: #1F6FEB;
+    background-color: #2563EB;
     color: white;
-    font-weight: bold;
+    font-weight: 700;
 }
 
+/* اسکرول‌بار */
 QScrollBar:vertical {
-    background-color: #0D1117;
-    width: 10px;
-    border-radius: 5px;
+    background-color: #0F172A;
+    width: 12px;
+    border-radius: 6px;
 }
 
 QScrollBar::handle:vertical {
-    background-color: #30363D;
-    border-radius: 5px;
-    min-height: 20px;
+    background-color: #475569;
+    border-radius: 6px;
+    min-height: 25px;
 }
 
 QScrollBar::handle:vertical:hover {
-    background-color: #484F58;
+    background-color: #60A5FA;
 }
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0;
 }
 
+/* پراگرس */
 QProgressBar {
-    background-color: #21262D;
+    background-color: #334155;
     border: none;
-    border-radius: 5px;
-    height: 10px;
+    border-radius: 6px;
+    height: 12px;
     text-align: center;
 }
 
 QProgressBar::chunk {
-    background-color: #1F6FEB;
-    border-radius: 5px;
+    background-color: #2563EB;
+    border-radius: 6px;
+}
+
+/* دیالوگ */
+QDialog {
+    background-color: #0F172A;
+}
+
+QMessageBox {
+    background-color: #1E293B;
+    color: #F1F5F9;
+    font-size: 14px;
+}
+
+QMessageBox QPushButton {
+    min-width: 100px;
+    padding: 8px 16px;
 }
 """
 
@@ -356,52 +426,53 @@ class SplashScreen(QWidget):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(500, 350)
+        self.setFixedSize(550, 400)
         self.setLayoutDirection(Qt.RightToLeft)
 
         screen = QApplication.primaryScreen().geometry()
-        x = (screen.width() - 500) // 2
-        y = (screen.height() - 350) // 2
+        x = (screen.width() - 550) // 2
+        y = (screen.height() - 400) // 2
         self.move(x, y)
 
         self.setup_ui()
 
     def setup_ui(self):
         container = QFrame(self)
-        container.setGeometry(0, 0, 500, 350)
+        container.setGeometry(0, 0, 550, 400)
         container.setStyleSheet("""
             QFrame {
-                background-color: #161B22;
-                border: 2px solid #1F6FEB;
-                border-radius: 20px;
+                background-color: #1E293B;
+                border: 3px solid #2563EB;
+                border-radius: 22px;
             }
         """)
 
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(15)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(18)
 
         logo = QLabel("🔍")
-        logo.setStyleSheet("font-size: 64px; padding: 5px;")
+        logo.setStyleSheet("font-size: 72px; padding: 5px; background-color: transparent;")
         logo.setAlignment(Qt.AlignCenter)
         layout.addWidget(logo)
 
         title = QLabel("CyberWatch")
         title.setStyleSheet("""
-            font-size: 32px;
-            font-weight: bold;
-            color: #58A6FF;
+            font-size: 38px;
+            font-weight: 900;
+            color: #60A5FA;
+            background-color: transparent;
         """)
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
         subtitle = QLabel("سامانه هوشمند جستجو و ثبت کاربران فضای مجازی")
-        subtitle.setStyleSheet("font-size: 12px; color: #8B949E;")
+        subtitle.setStyleSheet("font-size: 14px; color: #94A3B8; background-color: transparent;")
         subtitle.setAlignment(Qt.AlignCenter)
         subtitle.setWordWrap(True)
         layout.addWidget(subtitle)
 
-        layout.addSpacing(20)
+        layout.addSpacing(25)
 
         self.progress = QProgressBar()
         self.progress.setMinimum(0)
@@ -411,31 +482,32 @@ class SplashScreen(QWidget):
         self.progress.setFormat("%p%")
         self.progress.setStyleSheet("""
             QProgressBar {
-                background-color: #21262D;
-                border: 1px solid #30363D;
-                border-radius: 10px;
-                height: 24px;
+                background-color: #334155;
+                border: 2px solid #475569;
+                border-radius: 12px;
+                height: 28px;
                 text-align: center;
                 color: white;
-                font-weight: bold;
+                font-weight: 900;
+                font-size: 13px;
             }
             QProgressBar::chunk {
-                background-color: #1F6FEB;
+                background-color: #2563EB;
                 border-radius: 10px;
             }
         """)
-        self.progress.setFixedHeight(28)
+        self.progress.setFixedHeight(32)
         layout.addWidget(self.progress)
 
         self.status_label = QLabel("در حال آماده‌سازی...")
-        self.status_label.setStyleSheet("color: #E6EDF3; font-size: 12px;")
+        self.status_label.setStyleSheet("color: #E2E8F0; font-size: 14px; font-weight: 600; background-color: transparent;")
         self.status_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.status_label)
 
         layout.addStretch()
 
-        version = QLabel("نسخه ۷.۰")
-        version.setStyleSheet("color: #484F58; font-size: 10px;")
+        version = QLabel("نسخه ۸.۰")
+        version.setStyleSheet("color: #64748B; font-size: 12px; background-color: transparent;")
         version.setAlignment(Qt.AlignCenter)
         layout.addWidget(version)
 
@@ -452,10 +524,10 @@ class CyberWatchApp(QMainWindow):
         self.db = Database()
         self.edit_id = None
 
-        self.setWindowTitle("CyberWatch v7.0 - سامانه هوشمند")
+        self.setWindowTitle("CyberWatch v8.0 - سامانه هوشمند")
         self.setLayoutDirection(Qt.RightToLeft)
-        self.resize(1400, 850)
-        self.setMinimumSize(1200, 700)
+        self.resize(1500, 900)
+        self.setMinimumSize(1300, 750)
 
         if not self.db.is_ready():
             self.show_setup_dialog()
@@ -467,27 +539,30 @@ class CyberWatchApp(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("راه‌اندازی اولیه")
         dialog.setLayoutDirection(Qt.RightToLeft)
-        dialog.setMinimumWidth(500)
+        dialog.setMinimumWidth(550)
 
         layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
 
         title = QLabel("🔍 CyberWatch")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #58A6FF; padding: 10px;")
+        title.setStyleSheet("font-size: 28px; font-weight: 900; color: #60A5FA; padding: 15px;")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
         info = QLabel("برای شروع، فایل اکسل دیتابیس را انتخاب کنید")
         info.setAlignment(Qt.AlignCenter)
-        info.setStyleSheet("color: #8B949E; padding: 10px;")
+        info.setStyleSheet("color: #94A3B8; font-size: 15px; padding: 10px;")
         layout.addWidget(info)
 
         btn = QPushButton("📂 انتخاب فایل اکسل")
         btn.setObjectName("primaryButton")
-        btn.setMinimumHeight(45)
+        btn.setMinimumHeight(50)
         btn.clicked.connect(lambda: self.load_excel_dialog(dialog))
         layout.addWidget(btn)
 
         skip_btn = QPushButton("رد کردن (شروع با دیتابیس خالی)")
+        skip_btn.setMinimumHeight(40)
         skip_btn.clicked.connect(lambda: [self.db.create_tables(), dialog.accept()])
         layout.addWidget(skip_btn)
 
@@ -513,11 +588,39 @@ class CyberWatchApp(QMainWindow):
                 QMessageBox.critical(self, "خطا", "خطا در بارگذاری:\n" + str(e))
 
     def get_subjects_list(self):
-        """گرفتن لیست موضوعات - فقط پیش‌فرض‌ها بدون + یا ترکیب"""
         return DEFAULT_SUBJECTS
 
+    def get_clean_subject_stats(self):
+        """آمار موضوعات پاک شده (بدون ترکیب) بر اساس لیست نهایی"""
+        if not self.db.is_ready():
+            return []
+
+        conn = self.db._conn()
+        rows = conn.execute(
+            "SELECT subject FROM users WHERE subject != ''"
+        ).fetchall()
+        conn.close()
+
+        # شمارش هر موضوع اصلی
+        subject_counts = {s: 0 for s in DEFAULT_SUBJECTS if s}
+
+        for row in rows:
+            subj = row['subject']
+            # اگر ترکیبی بود، جدا کن
+            parts = [s.strip() for s in subj.split('|')]
+            for part in parts:
+                if part in subject_counts:
+                    subject_counts[part] += 1
+                else:
+                    # اگر موضوع در لیست نبود، اضافه نکن
+                    pass
+
+        # مرتب‌سازی بر اساس تعداد
+        result = [(s, c) for s, c in subject_counts.items() if c > 0]
+        result.sort(key=lambda x: x[1], reverse=True)
+        return result
+
     def get_user_all_subjects(self, instagram_id):
-        """گرفتن همه موضوعات یک کاربر بر اساس ایدی اینستاگرام"""
         if not self.db.is_ready():
             return []
         conn = self.db._conn()
@@ -529,7 +632,6 @@ class CyberWatchApp(QMainWindow):
         subjects = []
         for r in rows:
             subj = r['subject']
-            # اگر ترکیبی بود جدا کن
             parts = [s.strip() for s in subj.split('|')]
             for p in parts:
                 if p and p not in subjects:
@@ -567,7 +669,7 @@ class CyberWatchApp(QMainWindow):
     def create_sidebar(self):
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(220)
+        sidebar.setFixedWidth(250)
 
         layout = QVBoxLayout(sidebar)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -586,12 +688,12 @@ class CyberWatchApp(QMainWindow):
         self.nav_buttons = []
 
         nav_items = [
-            ("🏠  داشبورد", self.show_dashboard),
-            ("🔍  جستجوی هوشمند", self.show_search),
-            ("🔬  جستجوی پیشرفته", self.show_advanced),
-            ("➕  ثبت کاربر جدید", self.show_form),
-            ("📋  همه رکوردها", self.show_list),
-            ("⚙️  تنظیمات", self.show_settings),
+            ("🏠   داشبورد", self.show_dashboard),
+            ("🔍   جستجوی هوشمند", self.show_search),
+            ("🔬   جستجوی پیشرفته", self.show_advanced),
+            ("➕   ثبت کاربر جدید", self.show_form),
+            ("📋   همه رکوردها", self.show_list),
+            ("⚙️   تنظیمات", self.show_settings),
         ]
 
         for text, callback in nav_items:
@@ -599,19 +701,19 @@ class CyberWatchApp(QMainWindow):
             btn.setObjectName("navButton")
             btn.setCheckable(True)
             btn.clicked.connect(callback)
-            btn.setMinimumHeight(45)
+            btn.setMinimumHeight(52)
             layout.addWidget(btn)
             self.nav_buttons.append(btn)
 
         layout.addStretch()
 
         self.records_label = QLabel("کل رکوردها: 0")
-        self.records_label.setStyleSheet("color: #58A6FF; padding: 15px; font-weight: bold;")
+        self.records_label.setStyleSheet("color: #60A5FA; padding: 20px; font-weight: 700; font-size: 15px;")
         self.records_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.records_label)
 
-        version = QLabel("v7.0")
-        version.setStyleSheet("color: #484F58; padding: 5px;")
+        version = QLabel("v8.0")
+        version.setStyleSheet("color: #475569; padding: 8px; font-size: 12px;")
         version.setAlignment(Qt.AlignCenter)
         layout.addWidget(version)
 
@@ -624,11 +726,11 @@ class CyberWatchApp(QMainWindow):
     def create_page_header(self, title, subtitle=""):
         header = QFrame()
         header.setObjectName("pageHeader")
-        header.setFixedHeight(85)
+        header.setFixedHeight(90)
 
         layout = QVBoxLayout(header)
-        layout.setContentsMargins(20, 10, 20, 10)
-        layout.setSpacing(5)
+        layout.setContentsMargins(25, 12, 25, 12)
+        layout.setSpacing(6)
 
         title_lbl = QLabel(title)
         title_lbl.setObjectName("pageTitle")
@@ -647,14 +749,16 @@ class CyberWatchApp(QMainWindow):
 
         content = QWidget()
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(20)
 
         layout.addWidget(self.create_page_header(
             "🏠 داشبورد",
-            "نمای کلی از وضعیت دیتابیس"
+            "نمای کلی از وضعیت دیتابیس و آمار سامانه"
         ))
 
         self.stats_grid = QGridLayout()
+        self.stats_grid.setSpacing(15)
         layout.addLayout(self.stats_grid)
 
         self.subjects_card = QFrame()
@@ -672,6 +776,8 @@ class CyberWatchApp(QMainWindow):
 
     def update_dashboard(self):
         stats = self.db.get_stats()
+        clean_subjects = self.get_clean_subject_stats()
+
         self.records_label.setText("کل رکوردها: {:,}".format(stats['total']))
 
         while self.stats_grid.count():
@@ -684,30 +790,31 @@ class CyberWatchApp(QMainWindow):
         ig_pct = int((stats['filled'].get('instagram_id', 0) / max(stats['total'], 1)) * 100)
 
         cards = [
-            ("📦", "{:,}".format(stats['total']), "کل رکوردها", "#58A6FF"),
-            ("📅", str(active_years), "سال فعال", "#3FB950"),
-            ("📂", str(len(stats['subjects'])), "موضوعات", "#D29922"),
-            ("📱", "{}%".format(ph_pct), "شماره تماس", "#BC8CFF"),
-            ("📸", "{}%".format(ig_pct), "ایدی اینستا", "#F85149"),
+            ("📦", "{:,}".format(stats['total']), "کل رکوردها", "#60A5FA"),
+            ("📅", str(active_years), "سال فعال", "#10B981"),
+            ("📂", str(len(clean_subjects)), "موضوعات", "#F59E0B"),
+            ("📱", "{}%".format(ph_pct), "شماره تماس", "#A855F7"),
+            ("📸", "{}%".format(ig_pct), "ایدی اینستا", "#EF4444"),
         ]
 
         for i, (icon, value, label, color) in enumerate(cards):
             card = QFrame()
             card.setObjectName("statCard")
             card_layout = QVBoxLayout(card)
+            card_layout.setSpacing(8)
 
             icon_lbl = QLabel(icon)
-            icon_lbl.setStyleSheet("font-size: 32px;")
+            icon_lbl.setStyleSheet("font-size: 40px;")
             icon_lbl.setAlignment(Qt.AlignCenter)
 
             value_lbl = QLabel(value)
             value_lbl.setStyleSheet(
-                "font-size: 28px; font-weight: bold; color: " + color + ";"
+                "font-size: 32px; font-weight: 900; color: " + color + ";"
             )
             value_lbl.setAlignment(Qt.AlignCenter)
 
             label_lbl = QLabel(label)
-            label_lbl.setStyleSheet("color: #8B949E; font-size: 12px;")
+            label_lbl.setStyleSheet("color: #94A3B8; font-size: 14px; font-weight: 600;")
             label_lbl.setAlignment(Qt.AlignCenter)
 
             card_layout.addWidget(icon_lbl)
@@ -716,10 +823,10 @@ class CyberWatchApp(QMainWindow):
 
             self.stats_grid.addWidget(card, 0, i)
 
-        self.update_subjects_card(stats)
+        self.update_subjects_card(clean_subjects)
         self.update_years_card(stats)
 
-    def update_subjects_card(self, stats):
+    def update_subjects_card(self, subjects_data):
         old_layout = self.subjects_card.layout()
         if old_layout:
             while old_layout.count():
@@ -728,39 +835,47 @@ class CyberWatchApp(QMainWindow):
                     item.widget().deleteLater()
         else:
             old_layout = QVBoxLayout(self.subjects_card)
+            old_layout.setSpacing(12)
 
-        title = QLabel("📂 موضوعات ثبت شده")
-        title.setStyleSheet("font-size: 15px; font-weight: bold; padding: 5px;")
+        title = QLabel("📂 موضوعات ثبت شده (بر اساس دسته‌بندی اصلی)")
+        title.setStyleSheet("font-size: 17px; font-weight: 700; color: #60A5FA; padding: 8px;")
         old_layout.addWidget(title)
 
-        colors = ['#58A6FF', '#3FB950', '#D29922', '#F85149',
-                  '#BC8CFF', '#79C0FF', '#56D364', '#E3B341']
+        if not subjects_data:
+            no_data = QLabel("هیچ موضوعی ثبت نشده است")
+            no_data.setStyleSheet("color: #64748B; padding: 20px; font-size: 14px;")
+            no_data.setAlignment(Qt.AlignCenter)
+            old_layout.addWidget(no_data)
+            return
 
-        max_cnt = max((c for _, c in stats['subjects']), default=1)
+        max_cnt = max((c for _, c in subjects_data), default=1)
 
-        for i, (subj, cnt) in enumerate(stats['subjects'][:8]):
+        for subj, cnt in subjects_data:
             row_widget = QWidget()
             row = QHBoxLayout(row_widget)
+            row.setContentsMargins(10, 5, 10, 5)
 
-            name = QLabel("▸ " + subj[:30])
-            name.setStyleSheet("padding: 5px;")
-            row.addWidget(name, 2)
+            color = SUBJECT_COLORS.get(subj, "#60A5FA")
+
+            name = QLabel("▸  " + subj)
+            name.setStyleSheet("padding: 6px; font-size: 14px; font-weight: 600; color: #F1F5F9;")
+            row.addWidget(name, 3)
 
             bar = QProgressBar()
             bar.setMaximum(max_cnt)
             bar.setValue(cnt)
             bar.setTextVisible(False)
-            color = colors[i % len(colors)]
             bar.setStyleSheet(
-                "QProgressBar { background-color: #21262D; border: none; "
-                "border-radius: 4px; height: 8px; } "
+                "QProgressBar { background-color: #334155; border: none; "
+                "border-radius: 6px; height: 14px; } "
                 "QProgressBar::chunk { background-color: " + color +
-                "; border-radius: 4px; }"
+                "; border-radius: 6px; }"
             )
-            row.addWidget(bar, 3)
+            bar.setFixedHeight(14)
+            row.addWidget(bar, 4)
 
             count = QLabel(str(cnt))
-            count.setStyleSheet("color: " + color + "; font-weight: bold;")
+            count.setStyleSheet("color: " + color + "; font-weight: 900; font-size: 16px; padding: 5px 15px;")
             row.addWidget(count, 1)
 
             old_layout.addWidget(row_widget)
@@ -774,29 +889,42 @@ class CyberWatchApp(QMainWindow):
                     item.widget().deleteLater()
         else:
             old_layout = QVBoxLayout(self.years_card)
+            old_layout.setSpacing(12)
 
         title = QLabel("📅 توزیع سال‌های ثبت")
-        title.setStyleSheet("font-size: 15px; font-weight: bold; padding: 5px;")
+        title.setStyleSheet("font-size: 17px; font-weight: 700; color: #60A5FA; padding: 8px;")
         old_layout.addWidget(title)
 
         max_cnt = max((c for _, c in stats['years']), default=1)
 
-        for year, cnt in stats['years']:
+        year_colors = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#A855F7", "#EC4899", "#14B8A6"]
+
+        for i, (year, cnt) in enumerate(stats['years']):
             row_widget = QWidget()
             row = QHBoxLayout(row_widget)
+            row.setContentsMargins(10, 5, 10, 5)
 
-            name = QLabel("📅 " + str(year))
-            name.setStyleSheet("padding: 5px;")
+            color = year_colors[i % len(year_colors)]
+
+            name = QLabel("📅  " + str(year))
+            name.setStyleSheet("padding: 6px; font-size: 14px; font-weight: 700; color: #F1F5F9;")
             row.addWidget(name, 1)
 
             bar = QProgressBar()
             bar.setMaximum(max_cnt)
             bar.setValue(cnt)
             bar.setTextVisible(False)
+            bar.setStyleSheet(
+                "QProgressBar { background-color: #334155; border: none; "
+                "border-radius: 6px; height: 14px; } "
+                "QProgressBar::chunk { background-color: " + color +
+                "; border-radius: 6px; }"
+            )
+            bar.setFixedHeight(14)
             row.addWidget(bar, 4)
 
             count = QLabel("{:,}".format(cnt))
-            count.setStyleSheet("color: #58A6FF; font-weight: bold;")
+            count.setStyleSheet("color: " + color + "; font-weight: 900; font-size: 16px; padding: 5px 15px;")
             row.addWidget(count, 1)
 
             old_layout.addWidget(row_widget)
@@ -811,11 +939,12 @@ class CyberWatchApp(QMainWindow):
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         table.setSelectionBehavior(QTableWidget.SelectRows)
         table.setSelectionMode(QTableWidget.SingleSelection)
+        table.verticalHeader().setDefaultSectionSize(38)
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(1, QHeaderView.Stretch)
-        table.setColumnWidth(0, 60)
-        table.setColumnWidth(7, 80)
+        table.setColumnWidth(0, 70)
+        table.setColumnWidth(7, 90)
 
         return table
 
@@ -841,31 +970,35 @@ class CyberWatchApp(QMainWindow):
     def create_search_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(15)
 
         layout.addWidget(self.create_page_header(
             "🔍 جستجوی هوشمند",
-            "جستجو در تمام فیلدها"
+            "جستجو در تمام فیلدها همزمان"
         ))
 
         search_card = QFrame()
         search_card.setObjectName("card")
         search_layout = QHBoxLayout(search_card)
+        search_layout.setSpacing(12)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 نام، شماره، ایدی، موضوع، آدرس ...")
-        self.search_input.setMinimumHeight(40)
+        self.search_input.setPlaceholderText("🔍  نام، شماره، ایدی، موضوع، آدرس ...")
+        self.search_input.setMinimumHeight(48)
+        self.search_input.setStyleSheet("font-size: 15px; padding: 10px 15px;")
         self.search_input.returnPressed.connect(self.do_search)
         search_layout.addWidget(self.search_input, 5)
 
         search_btn = QPushButton("🔍 جستجو")
         search_btn.setObjectName("primaryButton")
-        search_btn.setMinimumHeight(40)
+        search_btn.setMinimumHeight(48)
+        search_btn.setStyleSheet("font-size: 15px;")
         search_btn.clicked.connect(self.do_search)
         search_layout.addWidget(search_btn, 1)
 
         clear_btn = QPushButton("🔄 پاک")
-        clear_btn.setMinimumHeight(40)
+        clear_btn.setMinimumHeight(48)
         clear_btn.clicked.connect(lambda: [
             self.search_input.clear(),
             self.search_table.setRowCount(0),
@@ -876,26 +1009,30 @@ class CyberWatchApp(QMainWindow):
         layout.addWidget(search_card)
 
         self.search_count = QLabel("")
-        self.search_count.setStyleSheet("color: #3FB950; font-weight: bold; padding: 5px;")
+        self.search_count.setStyleSheet("color: #10B981; font-weight: 700; padding: 8px; font-size: 15px;")
         layout.addWidget(self.search_count)
 
         self.search_table = self.create_results_table()
         layout.addWidget(self.search_table, 1)
 
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
 
         view_btn = QPushButton("👁️ مشاهده کامل")
         view_btn.setObjectName("primaryButton")
+        view_btn.setMinimumHeight(42)
         view_btn.clicked.connect(lambda: self.view_record(self.search_table))
         btn_row.addWidget(view_btn)
 
         edit_btn = QPushButton("✏️ ویرایش")
         edit_btn.setObjectName("warningButton")
+        edit_btn.setMinimumHeight(42)
         edit_btn.clicked.connect(lambda: self.edit_record(self.search_table))
         btn_row.addWidget(edit_btn)
 
         delete_btn = QPushButton("🗑️ حذف")
         delete_btn.setObjectName("dangerButton")
+        delete_btn.setMinimumHeight(42)
         delete_btn.clicked.connect(lambda: self.delete_record(self.search_table))
         btn_row.addWidget(delete_btn)
 
@@ -919,37 +1056,50 @@ class CyberWatchApp(QMainWindow):
             return
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("مشاهده کامل")
+        dialog.setWindowTitle("مشاهده کامل کاربر")
         dialog.setLayoutDirection(Qt.RightToLeft)
-        dialog.setMinimumSize(650, 550)
+        dialog.setMinimumSize(700, 600)
 
         layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
 
         name = "{} {}".format(rec.get('first_name', ''), rec.get('last_name', ''))
         title = QLabel("👤 " + name)
-        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #58A6FF; padding: 10px;")
+        title.setStyleSheet("font-size: 24px; font-weight: 900; color: #60A5FA; padding: 15px; background-color: #1E293B; border-radius: 10px;")
         layout.addWidget(title)
 
-        # نمایش همه موضوعات ثبت شده برای این کاربر
         instagram_id = rec.get('instagram_id', '')
         if instagram_id:
             all_subjects = self.get_user_all_subjects(instagram_id)
-            if len(all_subjects) > 1:
+            if all_subjects:
                 subjects_frame = QFrame()
                 subjects_frame.setStyleSheet(
-                    "background-color: #1F3D5F; border-radius: 8px; padding: 10px;"
+                    "background-color: #1E3A8A; border-radius: 10px; padding: 15px;"
                 )
                 sf_layout = QVBoxLayout(subjects_frame)
+                sf_layout.setSpacing(8)
 
                 lbl = QLabel("📂 همه موضوعات ثبت شده برای این کاربر:")
-                lbl.setStyleSheet("color: #58A6FF; font-weight: bold; font-size: 13px;")
+                lbl.setStyleSheet("color: #93C5FD; font-weight: 700; font-size: 15px;")
                 sf_layout.addWidget(lbl)
 
-                subjects_text = " • ".join(all_subjects)
-                subjects_lbl = QLabel(subjects_text)
-                subjects_lbl.setStyleSheet("color: white; font-size: 12px; padding: 5px;")
-                subjects_lbl.setWordWrap(True)
-                sf_layout.addWidget(subjects_lbl)
+                subjects_row = QHBoxLayout()
+                subjects_row.setSpacing(8)
+                for subj in all_subjects:
+                    color = SUBJECT_COLORS.get(subj, "#60A5FA")
+                    badge = QLabel("● " + subj)
+                    badge.setStyleSheet(
+                        "background-color: " + color + "; color: white; "
+                        "padding: 6px 12px; border-radius: 15px; "
+                        "font-weight: 700; font-size: 12px;"
+                    )
+                    subjects_row.addWidget(badge)
+                subjects_row.addStretch()
+
+                subjects_widget = QWidget()
+                subjects_widget.setLayout(subjects_row)
+                sf_layout.addWidget(subjects_widget)
 
                 layout.addWidget(subjects_frame)
 
@@ -971,18 +1121,21 @@ class CyberWatchApp(QMainWindow):
         scroll.setWidgetResizable(True)
         content = QWidget()
         content_layout = QVBoxLayout(content)
+        content_layout.setSpacing(8)
 
         for key, fa in fa_map.items():
             val = rec.get(key, '')
             if val:
                 row_widget = QWidget()
                 row = QHBoxLayout(row_widget)
+                row.setContentsMargins(5, 5, 5, 5)
+
                 lbl = QLabel(fa + ":")
-                lbl.setStyleSheet("color: #8B949E; font-weight: bold; min-width: 150px;")
+                lbl.setStyleSheet("color: #94A3B8; font-weight: 700; min-width: 170px; font-size: 14px;")
                 row.addWidget(lbl)
 
                 val_lbl = QLabel(str(val))
-                val_lbl.setStyleSheet("color: #E6EDF3; padding: 8px; background: #1C2128; border-radius: 6px;")
+                val_lbl.setStyleSheet("color: #F1F5F9; padding: 10px 14px; background: #334155; border-radius: 8px; font-size: 14px; font-weight: 500;")
                 val_lbl.setWordWrap(True)
                 row.addWidget(val_lbl, 1)
 
@@ -992,6 +1145,8 @@ class CyberWatchApp(QMainWindow):
         layout.addWidget(scroll)
 
         close_btn = QPushButton("بستن")
+        close_btn.setMinimumHeight(45)
+        close_btn.setStyleSheet("font-size: 15px;")
         close_btn.clicked.connect(dialog.accept)
         layout.addWidget(close_btn)
 
@@ -1026,16 +1181,18 @@ class CyberWatchApp(QMainWindow):
     def create_advanced_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(15)
 
         layout.addWidget(self.create_page_header(
             "🔬 جستجوی پیشرفته",
-            "فیلتر همزمان چند فیلد"
+            "فیلتر همزمان چند فیلد برای نتیجه دقیق‌تر"
         ))
 
         form_card = QFrame()
         form_card.setObjectName("card")
         form_layout = QGridLayout(form_card)
+        form_layout.setSpacing(15)
 
         self.adv_filters = {}
 
@@ -1050,12 +1207,14 @@ class CyberWatchApp(QMainWindow):
             col = i % 4
 
             container = QVBoxLayout()
+            container.setSpacing(6)
             lbl = QLabel(field)
             lbl.setObjectName("formLabel")
             container.addWidget(lbl)
 
             inp = QLineEdit()
             inp.setPlaceholderText(field + "...")
+            inp.setMinimumHeight(40)
             container.addWidget(inp)
             self.adv_filters[field] = inp
 
@@ -1064,10 +1223,12 @@ class CyberWatchApp(QMainWindow):
             form_layout.addWidget(wrapper, row, col)
 
         subj_container = QVBoxLayout()
+        subj_container.setSpacing(6)
         subj_lbl = QLabel("📂 موضوع ثبت")
         subj_lbl.setObjectName("formLabel")
         subj_container.addWidget(subj_lbl)
         self.adv_subject = QComboBox()
+        self.adv_subject.setMinimumHeight(42)
         self.adv_subject.addItems(self.get_subjects_list())
         subj_container.addWidget(self.adv_subject)
         subj_wrapper = QWidget()
@@ -1075,10 +1236,12 @@ class CyberWatchApp(QMainWindow):
         form_layout.addWidget(subj_wrapper, 2, 0, 1, 2)
 
         year_container = QVBoxLayout()
+        year_container.setSpacing(6)
         year_lbl = QLabel("📅 سال ثبت")
         year_lbl.setObjectName("formLabel")
         year_container.addWidget(year_lbl)
         self.adv_year = QComboBox()
+        self.adv_year.setMinimumHeight(42)
         self.adv_year.addItems(YEARS_LIST)
         year_container.addWidget(self.adv_year)
         year_wrapper = QWidget()
@@ -1088,14 +1251,16 @@ class CyberWatchApp(QMainWindow):
         layout.addWidget(form_card)
 
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
         search_btn = QPushButton("🔬 اعمال فیلترها")
         search_btn.setObjectName("primaryButton")
-        search_btn.setMinimumHeight(40)
+        search_btn.setMinimumHeight(45)
+        search_btn.setStyleSheet("font-size: 15px; min-width: 180px;")
         search_btn.clicked.connect(self.do_advanced_search)
         btn_row.addWidget(search_btn)
 
         clear_btn = QPushButton("🔄 پاک کردن")
-        clear_btn.setMinimumHeight(40)
+        clear_btn.setMinimumHeight(45)
         clear_btn.clicked.connect(self.clear_advanced)
         btn_row.addWidget(clear_btn)
 
@@ -1103,25 +1268,29 @@ class CyberWatchApp(QMainWindow):
         layout.addLayout(btn_row)
 
         self.adv_count = QLabel("")
-        self.adv_count.setStyleSheet("color: #3FB950; font-weight: bold; padding: 5px;")
+        self.adv_count.setStyleSheet("color: #10B981; font-weight: 700; padding: 8px; font-size: 15px;")
         layout.addWidget(self.adv_count)
 
         self.adv_table = self.create_results_table()
         layout.addWidget(self.adv_table, 1)
 
         btn_row2 = QHBoxLayout()
+        btn_row2.setSpacing(10)
         view_btn = QPushButton("👁️ مشاهده")
         view_btn.setObjectName("primaryButton")
+        view_btn.setMinimumHeight(42)
         view_btn.clicked.connect(lambda: self.view_record(self.adv_table))
         btn_row2.addWidget(view_btn)
 
         edit_btn = QPushButton("✏️ ویرایش")
         edit_btn.setObjectName("warningButton")
+        edit_btn.setMinimumHeight(42)
         edit_btn.clicked.connect(lambda: self.edit_record(self.adv_table))
         btn_row2.addWidget(edit_btn)
 
         delete_btn = QPushButton("🗑️ حذف")
         delete_btn.setObjectName("dangerButton")
+        delete_btn.setMinimumHeight(42)
         delete_btn.clicked.connect(lambda: self.delete_record(self.adv_table))
         btn_row2.addWidget(delete_btn)
 
@@ -1147,7 +1316,7 @@ class CyberWatchApp(QMainWindow):
 
         results = self.db.advanced_search(filters) if filters else []
         self.populate_table(self.adv_table, results)
-        self.adv_count.setText("✅ {} نتیجه".format(len(results)))
+        self.adv_count.setText("✅ {} نتیجه یافت شد".format(len(results)))
 
     def clear_advanced(self):
         for widget in self.adv_filters.values():
@@ -1163,82 +1332,118 @@ class CyberWatchApp(QMainWindow):
 
         content = QWidget()
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(20)
 
         self.form_header = self.create_page_header(
             "➕ ثبت کاربر جدید",
-            "اطلاعات کاربر را وارد کنید"
+            "اطلاعات کاربر جدید را با دقت وارد کنید"
         )
         layout.addWidget(self.form_header)
 
         form_card = QFrame()
         form_card.setObjectName("card")
         form_layout = QGridLayout(form_card)
+        form_layout.setSpacing(18)
 
         lbl = QLabel("⭐ ایدی اینستاگرام *")
         lbl.setObjectName("requiredLabel")
         form_layout.addWidget(lbl, 0, 0)
         self.form_instagram = QLineEdit()
+        self.form_instagram.setMinimumHeight(44)
         form_layout.addWidget(self.form_instagram, 0, 1)
 
-        form_layout.addWidget(QLabel("نام"), 0, 2)
+        lbl2 = QLabel("نام")
+        lbl2.setObjectName("formLabel")
+        form_layout.addWidget(lbl2, 0, 2)
         self.form_first_name = QLineEdit()
+        self.form_first_name.setMinimumHeight(44)
         form_layout.addWidget(self.form_first_name, 0, 3)
 
-        form_layout.addWidget(QLabel("نام خانوادگی"), 1, 0)
+        lbl3 = QLabel("نام خانوادگی")
+        lbl3.setObjectName("formLabel")
+        form_layout.addWidget(lbl3, 1, 0)
         self.form_last_name = QLineEdit()
+        self.form_last_name.setMinimumHeight(44)
         form_layout.addWidget(self.form_last_name, 1, 1)
 
-        form_layout.addWidget(QLabel("نام پدر"), 1, 2)
+        lbl4 = QLabel("نام پدر")
+        lbl4.setObjectName("formLabel")
+        form_layout.addWidget(lbl4, 1, 2)
         self.form_father_name = QLineEdit()
+        self.form_father_name.setMinimumHeight(44)
         form_layout.addWidget(self.form_father_name, 1, 3)
 
-        form_layout.addWidget(QLabel("شماره تماس"), 2, 0)
+        lbl5 = QLabel("شماره تماس")
+        lbl5.setObjectName("formLabel")
+        form_layout.addWidget(lbl5, 2, 0)
         self.form_phone = QLineEdit()
+        self.form_phone.setMinimumHeight(44)
         form_layout.addWidget(self.form_phone, 2, 1)
 
-        form_layout.addWidget(QLabel("شماره ملی"), 2, 2)
+        lbl6 = QLabel("شماره ملی")
+        lbl6.setObjectName("formLabel")
+        form_layout.addWidget(lbl6, 2, 2)
         self.form_national_id = QLineEdit()
+        self.form_national_id.setMinimumHeight(44)
         form_layout.addWidget(self.form_national_id, 2, 3)
 
-        form_layout.addWidget(QLabel("📂 موضوع ثبت"), 3, 0)
+        lbl7 = QLabel("📂 موضوع ثبت *")
+        lbl7.setObjectName("requiredLabel")
+        form_layout.addWidget(lbl7, 3, 0)
         self.form_subject = QComboBox()
+        self.form_subject.setMinimumHeight(44)
         self.form_subject.addItems(self.get_subjects_list())
         form_layout.addWidget(self.form_subject, 3, 1)
 
-        form_layout.addWidget(QLabel("📅 سال ثبت"), 3, 2)
+        lbl8 = QLabel("📅 سال ثبت")
+        lbl8.setObjectName("formLabel")
+        form_layout.addWidget(lbl8, 3, 2)
         self.form_year = QComboBox()
+        self.form_year.setMinimumHeight(44)
         self.form_year.addItems(YEARS_LIST)
         form_layout.addWidget(self.form_year, 3, 3)
 
-        form_layout.addWidget(QLabel("کد تارنما"), 4, 0)
+        lbl9 = QLabel("کد تارنما")
+        lbl9.setObjectName("formLabel")
+        form_layout.addWidget(lbl9, 4, 0)
         self.form_tarnama = QLineEdit()
+        self.form_tarnama.setMinimumHeight(44)
         form_layout.addWidget(self.form_tarnama, 4, 1)
 
-        form_layout.addWidget(QLabel("تاریخ ثبت"), 4, 2)
+        lbl10 = QLabel("تاریخ ثبت")
+        lbl10.setObjectName("formLabel")
+        form_layout.addWidget(lbl10, 4, 2)
         self.form_reg_date = QLineEdit()
+        self.form_reg_date.setMinimumHeight(44)
         form_layout.addWidget(self.form_reg_date, 4, 3)
 
-        form_layout.addWidget(QLabel("نشانی"), 5, 0)
+        lbl11 = QLabel("نشانی")
+        lbl11.setObjectName("formLabel")
+        form_layout.addWidget(lbl11, 5, 0)
         self.form_address = QTextEdit()
-        self.form_address.setMaximumHeight(80)
+        self.form_address.setMaximumHeight(100)
         form_layout.addWidget(self.form_address, 5, 1, 1, 3)
 
         layout.addWidget(form_card)
 
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(15)
 
-        self.save_btn = QPushButton("✅ ثبت کاربر")
+        self.save_btn = QPushButton("✅  ثبت کاربر")
         self.save_btn.setObjectName("successButton")
-        self.save_btn.setMinimumHeight(45)
+        self.save_btn.setMinimumHeight(50)
+        self.save_btn.setStyleSheet("font-size: 16px; min-width: 200px;")
         self.save_btn.clicked.connect(self.save_form)
         btn_row.addWidget(self.save_btn)
 
-        cancel_btn = QPushButton("❌ انصراف")
-        cancel_btn.setMinimumHeight(45)
+        cancel_btn = QPushButton("❌  انصراف")
+        cancel_btn.setMinimumHeight(50)
+        cancel_btn.setStyleSheet("font-size: 15px; min-width: 150px;")
         cancel_btn.clicked.connect(self.cancel_form)
         btn_row.addWidget(cancel_btn)
 
+        btn_row.addStretch()
         layout.addLayout(btn_row)
         layout.addStretch()
 
@@ -1257,7 +1462,6 @@ class CyberWatchApp(QMainWindow):
         self.form_address.setPlainText(rec.get('address', ''))
 
         subj = rec.get('subject', '')
-        # اگر موضوع ترکیبی بود، اولین بخش رو انتخاب کن
         if '|' in subj:
             subj = subj.split('|')[0].strip()
         idx = self.form_subject.findText(subj)
@@ -1315,11 +1519,11 @@ class CyberWatchApp(QMainWindow):
 
         if self.edit_id:
             self.db.update_user(self.edit_id, data)
-            QMessageBox.information(self, "موفق", "✅ ویرایش شد!")
+            QMessageBox.information(self, "موفق", "✅ اطلاعات با موفقیت ویرایش شد!")
             self.edit_id = None
         else:
             self.db.add_user(data)
-            QMessageBox.information(self, "موفق", "✅ کاربر جدید ثبت شد!")
+            QMessageBox.information(self, "موفق", "✅ کاربر جدید با موفقیت ثبت شد!")
 
         self.clear_form()
         self.show_dashboard()
@@ -1332,38 +1536,44 @@ class CyberWatchApp(QMainWindow):
     def create_list_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(15)
 
         layout.addWidget(self.create_page_header(
             "📋 همه رکوردها",
-            "نمایش تمام رکوردهای ثبت شده"
+            "نمایش تمام رکوردهای ثبت شده در دیتابیس"
         ))
 
         self.list_count = QLabel("")
-        self.list_count.setStyleSheet("color: #58A6FF; font-weight: bold; padding: 5px;")
+        self.list_count.setStyleSheet("color: #60A5FA; font-weight: 700; padding: 8px; font-size: 15px;")
         layout.addWidget(self.list_count)
 
         self.list_table = self.create_results_table()
         layout.addWidget(self.list_table, 1)
 
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
 
         view_btn = QPushButton("👁️ مشاهده")
         view_btn.setObjectName("primaryButton")
+        view_btn.setMinimumHeight(42)
         view_btn.clicked.connect(lambda: self.view_record(self.list_table))
         btn_row.addWidget(view_btn)
 
         edit_btn = QPushButton("✏️ ویرایش")
         edit_btn.setObjectName("warningButton")
+        edit_btn.setMinimumHeight(42)
         edit_btn.clicked.connect(lambda: self.edit_record(self.list_table))
         btn_row.addWidget(edit_btn)
 
         delete_btn = QPushButton("🗑️ حذف")
         delete_btn.setObjectName("dangerButton")
+        delete_btn.setMinimumHeight(42)
         delete_btn.clicked.connect(lambda: self.delete_record(self.list_table))
         btn_row.addWidget(delete_btn)
 
         export_btn = QPushButton("📥 خروجی اکسل")
+        export_btn.setMinimumHeight(42)
         export_btn.clicked.connect(self.export_excel)
         btn_row.addWidget(export_btn)
 
@@ -1393,64 +1603,77 @@ class CyberWatchApp(QMainWindow):
     def create_settings_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(15)
 
         layout.addWidget(self.create_page_header(
             "⚙️ تنظیمات",
-            "مدیریت دیتابیس"
+            "مدیریت دیتابیس و اطلاعات سامانه"
         ))
 
         tabs = QTabWidget()
 
         reload_tab = QWidget()
         reload_layout = QVBoxLayout(reload_tab)
+        reload_layout.setContentsMargins(20, 20, 20, 20)
+        reload_layout.setSpacing(15)
 
-        warn = QLabel("⚠️ داده‌های فعلی جایگزین می‌شوند")
-        warn.setStyleSheet("color: #D29922; padding: 10px;")
+        warn = QLabel("⚠️  توجه: بارگذاری مجدد، تمام داده‌های فعلی را جایگزین می‌کند")
+        warn.setStyleSheet("color: #F59E0B; padding: 15px; font-size: 14px; font-weight: 600; background-color: #78350F; border-radius: 8px;")
         reload_layout.addWidget(warn)
 
-        reload_btn = QPushButton("📂 انتخاب و بارگذاری فایل اکسل")
+        reload_btn = QPushButton("📂  انتخاب و بارگذاری فایل اکسل")
         reload_btn.setObjectName("primaryButton")
-        reload_btn.setMinimumHeight(45)
+        reload_btn.setMinimumHeight(50)
+        reload_btn.setStyleSheet("font-size: 15px;")
         reload_btn.clicked.connect(lambda: self.load_excel_dialog())
         reload_layout.addWidget(reload_btn)
         reload_layout.addStretch()
 
-        tabs.addTab(reload_tab, "📂 بارگذاری مجدد")
+        tabs.addTab(reload_tab, "📂  بارگذاری مجدد")
 
         about_tab = QWidget()
         about_layout = QVBoxLayout(about_tab)
+        about_layout.setContentsMargins(20, 20, 20, 20)
 
-        subjects_text = "<br>".join(["• " + s for s in DEFAULT_SUBJECTS if s])
+        subjects_html = ""
+        for s in DEFAULT_SUBJECTS:
+            if s:
+                color = SUBJECT_COLORS.get(s, "#60A5FA")
+                subjects_html += "<span style='background-color:" + color + "; color:white; padding:5px 12px; border-radius:12px; margin:3px; display:inline-block; font-weight:600; font-size:12px;'>● " + s + "</span> "
 
         about_text = QLabel(
             "<div style='line-height: 2;'>"
-            "<h2 style='color: #58A6FF;'>🔍 CyberWatch v7.0</h2>"
-            "<p><b>سامانه هوشمند جستجو و ثبت کاربران فضای مجازی</b></p>"
-            "<hr>"
-            "<p><b>ویژگی‌ها:</b></p>"
-            "<ul>"
+            "<h1 style='color: #60A5FA;'>🔍 CyberWatch v8.0</h1>"
+            "<p style='font-size:16px;'><b>سامانه هوشمند جستجو و ثبت کاربران فضای مجازی</b></p>"
+            "<hr style='border-color:#334155;'>"
+            "<h3 style='color:#10B981;'>✨ ویژگی‌ها:</h3>"
+            "<ul style='font-size:14px;'>"
             "<li>✅ جستجوی هوشمند در تمام فیلدها</li>"
             "<li>✅ جستجوی پیشرفته با فیلترهای همزمان</li>"
-            "<li>✅ کمبوباکس برای موضوع و سال</li>"
-            "<li>✅ نمایش همه موضوعات یک کاربر در پروفایل</li>"
+            "<li>✅ کمبوباکس رنگی برای موضوع و سال</li>"
+            "<li>✅ نمایش همه موضوعات یک کاربر با بج رنگی</li>"
             "<li>✅ ثبت، ویرایش، حذف</li>"
             "<li>✅ خروجی اکسل</li>"
             "<li>✅ 100% Desktop - بدون مرورگر</li>"
             "</ul>"
-            "<hr>"
-            "<p><b>📂 موضوعات قابل انتخاب:</b></p>"
-            "<div style='color: #58A6FF; padding: 10px;'>" + subjects_text + "</div>"
-            "<hr>"
-            "<p><b>مسیر دیتابیس:</b><br>"
-            "<code style='color: #58A6FF;'>" + self.db.db_path + "</code></p>"
+            "<hr style='border-color:#334155;'>"
+            "<h3 style='color:#F59E0B;'>📂 موضوعات قابل انتخاب:</h3>"
+            "<div style='padding: 10px;'>" + subjects_html + "</div>"
+            "<hr style='border-color:#334155;'>"
+            "<p style='color:#94A3B8;'><b>مسیر دیتابیس:</b><br>"
+            "<code style='color: #60A5FA; background-color:#1E293B; padding:5px;'>" + self.db.db_path + "</code></p>"
             "</div>"
         )
         about_text.setWordWrap(True)
-        about_layout.addWidget(about_text)
-        about_layout.addStretch()
+        about_text.setStyleSheet("font-size: 14px;")
 
-        tabs.addTab(about_tab, "ℹ️ درباره")
+        scroll_about = QScrollArea()
+        scroll_about.setWidgetResizable(True)
+        scroll_about.setWidget(about_text)
+        about_layout.addWidget(scroll_about)
+
+        tabs.addTab(about_tab, "ℹ️  درباره")
 
         layout.addWidget(tabs)
 
@@ -1493,15 +1716,15 @@ def main():
 
     steps = [
         (15, "در حال بارگذاری کتابخانه‌ها..."),
-        (35, "در حال راه‌اندازی رابط..."),
+        (35, "در حال راه‌اندازی رابط کاربری..."),
         (55, "در حال اتصال به دیتابیس..."),
-        (75, "در حال آماده‌سازی..."),
+        (75, "در حال آماده‌سازی نهایی..."),
         (100, "✅ آماده!"),
     ]
 
     for value, status in steps:
         splash.update_progress(value, status)
-        time.sleep(0.3)
+        time.sleep(0.4)
 
     window = CyberWatchApp()
     splash.close()
