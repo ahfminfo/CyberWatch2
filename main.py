@@ -1,5 +1,5 @@
 """
-CyberWatch Desktop v6.0 - PyQt5
+CyberWatch Desktop v7.0 - PyQt5 نسخه نهایی
 سامانه هوشمند جستجو و ثبت کاربران فضای مجازی
 """
 import sys
@@ -19,10 +19,20 @@ from database import Database
 
 YEARS_LIST = [""] + [str(y) for y in range(1399, 1416)]
 
+# لیست نهایی موضوعات (تنها - بدون +)
 DEFAULT_SUBJECTS = [
-    "", "اراذل و اوباش", "اخلاقی", "سلاح",
-    "تشویش اذهان عمومی", "سیاسی", "امنیتی",
-    "سلطنت طلب", "تشکیل دسته یا جمعیت",
+    "",
+    "اراذل و اوباش",
+    "اخلاقی",
+    "سلاح",
+    "تشویش اذهان عمومی",
+    "سیاسی",
+    "امنیتی",
+    "سلطنت طلب",
+    "تشکیل دسته یا جمعیت با هدف بر هم زدن امنیت کشور",
+    "پانجیا",
+    "رصد اولیه",
+    "کنکور",
 ]
 
 
@@ -96,58 +106,6 @@ QPushButton#navButton:checked {
     background-color: transparent;
 }
 
-QComboBox {
-    background-color: #21262D;
-    color: #E6EDF3;
-    border: 2px solid #388BFD;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 13px;
-    min-height: 24px;
-    selection-background-color: #1F6FEB;
-}
-
-QComboBox:hover {
-    border-color: #58A6FF;
-    background-color: #30363D;
-}
-
-QComboBox::drop-down {
-    subcontrol-origin: padding;
-    subcontrol-position: top left;
-    width: 30px;
-    border-left: 1px solid #388BFD;
-    background-color: #1F6FEB;
-    border-top-left-radius: 4px;
-    border-bottom-left-radius: 4px;
-}
-
-QComboBox::down-arrow {
-    image: none;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 6px solid white;
-    width: 0;
-    height: 0;
-}
-
-QComboBox QAbstractItemView {
-    background-color: #161B22;
-    color: #E6EDF3;
-    border: 1px solid #388BFD;
-    selection-background-color: #1F6FEB;
-    padding: 5px;
-}
-
-QComboBox QAbstractItemView::item {
-    padding: 8px;
-    min-height: 24px;
-}
-
-QComboBox QAbstractItemView::item:hover {
-    background-color: #1F3D5F;
-}
-
 #card {
     background-color: #161B22;
     border: 1px solid #21262D;
@@ -217,7 +175,7 @@ QPushButton#warningButton {
     font-weight: bold;
 }
 
-QLineEdit, QTextEdit, QComboBox {
+QLineEdit, QTextEdit {
     background-color: #0D1117;
     color: #E6EDF3;
     border: 1px solid #30363D;
@@ -227,20 +185,72 @@ QLineEdit, QTextEdit, QComboBox {
     min-height: 20px;
 }
 
-QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
+QLineEdit:focus, QTextEdit:focus {
+    border-color: #58A6FF;
+}
+
+QComboBox {
+    background-color: #21262D;
+    color: #E6EDF3;
+    border: 2px solid #388BFD;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    min-height: 24px;
+    selection-background-color: #1F6FEB;
+}
+
+QComboBox:hover {
+    border-color: #58A6FF;
+    background-color: #30363D;
+}
+
+QComboBox:focus {
     border-color: #58A6FF;
 }
 
 QComboBox::drop-down {
-    border: none;
-    width: 25px;
+    subcontrol-origin: padding;
+    subcontrol-position: top left;
+    width: 30px;
+    border-left: 1px solid #388BFD;
+    background-color: #1F6FEB;
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+QComboBox::down-arrow {
+    image: none;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid white;
+    width: 0;
+    height: 0;
 }
 
 QComboBox QAbstractItemView {
     background-color: #161B22;
     color: #E6EDF3;
-    border: 1px solid #30363D;
+    border: 1px solid #388BFD;
     selection-background-color: #1F6FEB;
+    padding: 5px;
+    outline: 0;
+}
+
+QComboBox QAbstractItemView::item {
+    padding: 8px;
+    min-height: 24px;
+    border-bottom: 1px solid #21262D;
+}
+
+QComboBox QAbstractItemView::item:hover {
+    background-color: #1F3D5F;
+    color: white;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    background-color: #1F6FEB;
+    color: white;
 }
 
 QTableWidget {
@@ -424,7 +434,7 @@ class SplashScreen(QWidget):
 
         layout.addStretch()
 
-        version = QLabel("نسخه ۶.۰")
+        version = QLabel("نسخه ۷.۰")
         version.setStyleSheet("color: #484F58; font-size: 10px;")
         version.setAlignment(Qt.AlignCenter)
         layout.addWidget(version)
@@ -442,7 +452,7 @@ class CyberWatchApp(QMainWindow):
         self.db = Database()
         self.edit_id = None
 
-        self.setWindowTitle("CyberWatch v6.0 - سامانه هوشمند")
+        self.setWindowTitle("CyberWatch v7.0 - سامانه هوشمند")
         self.setLayoutDirection(Qt.RightToLeft)
         self.resize(1400, 850)
         self.setMinimumSize(1200, 700)
@@ -503,17 +513,28 @@ class CyberWatchApp(QMainWindow):
                 QMessageBox.critical(self, "خطا", "خطا در بارگذاری:\n" + str(e))
 
     def get_subjects_list(self):
+        """گرفتن لیست موضوعات - فقط پیش‌فرض‌ها بدون + یا ترکیب"""
+        return DEFAULT_SUBJECTS
+
+    def get_user_all_subjects(self, instagram_id):
+        """گرفتن همه موضوعات یک کاربر بر اساس ایدی اینستاگرام"""
         if not self.db.is_ready():
-            return DEFAULT_SUBJECTS
-        stats = self.db.get_stats()
-        all_subjects = set()
-        for subj, _ in stats['subjects']:
+            return []
+        conn = self.db._conn()
+        rows = conn.execute(
+            "SELECT DISTINCT subject FROM users WHERE instagram_id=? AND subject!=''",
+            (instagram_id,)
+        ).fetchall()
+        conn.close()
+        subjects = []
+        for r in rows:
+            subj = r['subject']
+            # اگر ترکیبی بود جدا کن
             parts = [s.strip() for s in subj.split('|')]
             for p in parts:
-                if p:
-                    all_subjects.add(p)
-        result = [""] + sorted(all_subjects)
-        return result if len(result) > 1 else DEFAULT_SUBJECTS
+                if p and p not in subjects:
+                    subjects.append(p)
+        return subjects
 
     def setup_ui(self):
         central = QWidget()
@@ -589,7 +610,7 @@ class CyberWatchApp(QMainWindow):
         self.records_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.records_label)
 
-        version = QLabel("v6.0")
+        version = QLabel("v7.0")
         version.setStyleSheet("color: #484F58; padding: 5px;")
         version.setAlignment(Qt.AlignCenter)
         layout.addWidget(version)
@@ -606,6 +627,8 @@ class CyberWatchApp(QMainWindow):
         header.setFixedHeight(85)
 
         layout = QVBoxLayout(header)
+        layout.setContentsMargins(20, 10, 20, 10)
+        layout.setSpacing(5)
 
         title_lbl = QLabel(title)
         title_lbl.setObjectName("pageTitle")
@@ -898,7 +921,7 @@ class CyberWatchApp(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("مشاهده کامل")
         dialog.setLayoutDirection(Qt.RightToLeft)
-        dialog.setMinimumSize(600, 500)
+        dialog.setMinimumSize(650, 550)
 
         layout = QVBoxLayout(dialog)
 
@@ -907,6 +930,29 @@ class CyberWatchApp(QMainWindow):
         title.setStyleSheet("font-size: 20px; font-weight: bold; color: #58A6FF; padding: 10px;")
         layout.addWidget(title)
 
+        # نمایش همه موضوعات ثبت شده برای این کاربر
+        instagram_id = rec.get('instagram_id', '')
+        if instagram_id:
+            all_subjects = self.get_user_all_subjects(instagram_id)
+            if len(all_subjects) > 1:
+                subjects_frame = QFrame()
+                subjects_frame.setStyleSheet(
+                    "background-color: #1F3D5F; border-radius: 8px; padding: 10px;"
+                )
+                sf_layout = QVBoxLayout(subjects_frame)
+
+                lbl = QLabel("📂 همه موضوعات ثبت شده برای این کاربر:")
+                lbl.setStyleSheet("color: #58A6FF; font-weight: bold; font-size: 13px;")
+                sf_layout.addWidget(lbl)
+
+                subjects_text = " • ".join(all_subjects)
+                subjects_lbl = QLabel(subjects_text)
+                subjects_lbl.setStyleSheet("color: white; font-size: 12px; padding: 5px;")
+                subjects_lbl.setWordWrap(True)
+                sf_layout.addWidget(subjects_lbl)
+
+                layout.addWidget(subjects_frame)
+
         fa_map = {
             'instagram_id': 'ایدی اینستاگرام',
             'first_name': 'نام',
@@ -914,7 +960,7 @@ class CyberWatchApp(QMainWindow):
             'father_name': 'نام پدر',
             'phone': 'شماره تماس',
             'national_id': 'شماره ملی',
-            'subject': 'موضوع ثبت',
+            'subject': 'موضوع این ثبت',
             'tarnama_code': 'کد تارنما',
             'reg_date': 'تاریخ ثبت',
             'address': 'نشانی',
@@ -1157,7 +1203,6 @@ class CyberWatchApp(QMainWindow):
 
         form_layout.addWidget(QLabel("📂 موضوع ثبت"), 3, 0)
         self.form_subject = QComboBox()
-        self.form_subject.setEditable(True)
         self.form_subject.addItems(self.get_subjects_list())
         form_layout.addWidget(self.form_subject, 3, 1)
 
@@ -1212,19 +1257,23 @@ class CyberWatchApp(QMainWindow):
         self.form_address.setPlainText(rec.get('address', ''))
 
         subj = rec.get('subject', '')
+        # اگر موضوع ترکیبی بود، اولین بخش رو انتخاب کن
+        if '|' in subj:
+            subj = subj.split('|')[0].strip()
         idx = self.form_subject.findText(subj)
         if idx >= 0:
             self.form_subject.setCurrentIndex(idx)
         else:
-            self.form_subject.setEditText(subj)
+            self.form_subject.setCurrentIndex(0)
 
         year = rec.get('reg_year', '')
+        if '|' in year:
+            year = year.split('|')[0].strip()
         idx = self.form_year.findText(year)
         if idx >= 0:
             self.form_year.setCurrentIndex(idx)
         else:
-            self.form_year.addItem(year)
-            self.form_year.setCurrentText(year)
+            self.form_year.setCurrentIndex(0)
 
     def clear_form(self):
         self.form_instagram.clear()
@@ -1245,6 +1294,11 @@ class CyberWatchApp(QMainWindow):
             QMessageBox.warning(self, "خطا", "⭐ ایدی اینستاگرام الزامی است!")
             return
 
+        subject = self.form_subject.currentText().strip()
+        if not subject:
+            QMessageBox.warning(self, "خطا", "📂 موضوع ثبت الزامی است!")
+            return
+
         data = {
             'instagram_id': instagram_id,
             'first_name': self.form_first_name.text().strip(),
@@ -1252,7 +1306,7 @@ class CyberWatchApp(QMainWindow):
             'father_name': self.form_father_name.text().strip(),
             'phone': self.form_phone.text().strip(),
             'national_id': self.form_national_id.text().strip(),
-            'subject': self.form_subject.currentText().strip(),
+            'subject': subject,
             'tarnama_code': self.form_tarnama.text().strip(),
             'reg_date': self.form_reg_date.text().strip(),
             'address': self.form_address.toPlainText().strip(),
@@ -1367,20 +1421,26 @@ class CyberWatchApp(QMainWindow):
         about_tab = QWidget()
         about_layout = QVBoxLayout(about_tab)
 
+        subjects_text = "<br>".join(["• " + s for s in DEFAULT_SUBJECTS if s])
+
         about_text = QLabel(
             "<div style='line-height: 2;'>"
-            "<h2 style='color: #58A6FF;'>🔍 CyberWatch v6.0</h2>"
+            "<h2 style='color: #58A6FF;'>🔍 CyberWatch v7.0</h2>"
             "<p><b>سامانه هوشمند جستجو و ثبت کاربران فضای مجازی</b></p>"
             "<hr>"
             "<p><b>ویژگی‌ها:</b></p>"
             "<ul>"
-            "<li>✅ جستجوی هوشمند</li>"
-            "<li>✅ جستجوی پیشرفته با فیلتر</li>"
-            "<li>✅ کمبوباکس برای سال و موضوع</li>"
+            "<li>✅ جستجوی هوشمند در تمام فیلدها</li>"
+            "<li>✅ جستجوی پیشرفته با فیلترهای همزمان</li>"
+            "<li>✅ کمبوباکس برای موضوع و سال</li>"
+            "<li>✅ نمایش همه موضوعات یک کاربر در پروفایل</li>"
             "<li>✅ ثبت، ویرایش، حذف</li>"
             "<li>✅ خروجی اکسل</li>"
             "<li>✅ 100% Desktop - بدون مرورگر</li>"
             "</ul>"
+            "<hr>"
+            "<p><b>📂 موضوعات قابل انتخاب:</b></p>"
+            "<div style='color: #58A6FF; padding: 10px;'>" + subjects_text + "</div>"
             "<hr>"
             "<p><b>مسیر دیتابیس:</b><br>"
             "<code style='color: #58A6FF;'>" + self.db.db_path + "</code></p>"
@@ -1407,17 +1467,10 @@ class CyberWatchApp(QMainWindow):
 
     def show_advanced(self):
         self.set_active_nav(2)
-        self.adv_subject.clear()
-        self.adv_subject.addItems(self.get_subjects_list())
         self.stack.setCurrentIndex(2)
 
     def show_form(self):
         self.set_active_nav(3)
-        current_subj = self.form_subject.currentText()
-        self.form_subject.clear()
-        self.form_subject.addItems(self.get_subjects_list())
-        if current_subj:
-            self.form_subject.setCurrentText(current_subj)
         self.stack.setCurrentIndex(3)
 
     def show_list(self):
