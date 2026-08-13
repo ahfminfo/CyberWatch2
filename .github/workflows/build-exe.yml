@@ -28,9 +28,6 @@ jobs:
         pyinstaller --onedir --windowed --name "CyberWatch" `
           --add-data "database.py;." `
           --collect-all PyQt5 `
-          --collect-submodules PyQt5 `
-          --collect-binaries PyQt5 `
-          --collect-data PyQt5 `
           --hidden-import PyQt5 `
           --hidden-import PyQt5.QtCore `
           --hidden-import PyQt5.QtGui `
@@ -40,6 +37,17 @@ jobs:
           --hidden-import sqlite3 `
           --hidden-import numpy `
           main.py
+    
+    - name: Verify build
+      run: |
+        if (Test-Path "dist/CyberWatch/CyberWatch.exe") {
+          Write-Host "✅ Build successful!"
+          $size = (Get-Item "dist/CyberWatch/CyberWatch.exe").Length / 1MB
+          Write-Host "📦 EXE Size: $([math]::Round($size, 2)) MB"
+        } else {
+          Write-Host "❌ Build failed!"
+          exit 1
+        }
     
     - name: Compress output
       run: |
