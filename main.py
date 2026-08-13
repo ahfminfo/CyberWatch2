@@ -2,6 +2,7 @@
 CyberWatch Desktop v8.0 - نسخه نهایی حرفه‌ای
 سامانه هوشمند جستجو و ثبت کاربران فضای مجازی
 طراحی: مایکروسافت/گوگل استایل
+تمام مشکلات پنجره‌ها اصلاح شده
 """
 import sys
 import os
@@ -20,7 +21,6 @@ from database import Database
 
 YEARS_LIST = [""] + [str(y) for y in range(1399, 1416)]
 
-# لیست نهایی موضوعات
 DEFAULT_SUBJECTS = [
     "",
     "اراذل و اوباش",
@@ -36,7 +36,6 @@ DEFAULT_SUBJECTS = [
     "کنکور",
 ]
 
-# رنگ‌های تخصیص یافته به هر موضوع
 SUBJECT_COLORS = {
     "اراذل و اوباش": "#EF4444",
     "اخلاقی": "#F59E0B",
@@ -63,7 +62,6 @@ QMainWindow, QWidget {
     font-size: 14px;
 }
 
-/* سایدبار */
 #sidebar {
     background-color: #1E293B;
     border-right: 2px solid #334155;
@@ -105,7 +103,6 @@ QPushButton#navButton:checked {
     font-weight: 700;
 }
 
-/* هدر صفحه */
 #pageHeader {
     background-color: #2563EB;
     border-radius: 14px;
@@ -131,7 +128,6 @@ QPushButton#navButton:checked {
     background-color: transparent;
 }
 
-/* کارت‌ها */
 #card {
     background-color: #1E293B;
     border: 1px solid #334155;
@@ -146,7 +142,6 @@ QPushButton#navButton:checked {
     padding: 20px;
 }
 
-/* دکمه‌ها */
 QPushButton {
     background-color: #334155;
     color: #F1F5F9;
@@ -209,7 +204,6 @@ QPushButton#warningButton:hover {
     background-color: #D97706;
 }
 
-/* ورودی‌ها */
 QLineEdit, QTextEdit {
     background-color: #0F172A;
     color: #F1F5F9;
@@ -225,7 +219,6 @@ QLineEdit:focus, QTextEdit:focus {
     background-color: #1E293B;
 }
 
-/* کمبوباکس */
 QComboBox {
     background-color: #1E293B;
     color: #F1F5F9;
@@ -294,7 +287,6 @@ QComboBox QAbstractItemView::item:selected {
     font-weight: 700;
 }
 
-/* جدول */
 QTableWidget {
     background-color: #1E293B;
     color: #F1F5F9;
@@ -324,7 +316,6 @@ QHeaderView::section {
     font-size: 13px;
 }
 
-/* لیبل‌ها */
 QLabel {
     color: #F1F5F9;
     font-size: 14px;
@@ -344,7 +335,6 @@ QLabel#requiredLabel {
     padding: 4px 0;
 }
 
-/* تب‌ها */
 QTabWidget::pane {
     border: 1px solid #334155;
     border-radius: 10px;
@@ -368,7 +358,6 @@ QTabBar::tab:selected {
     font-weight: 700;
 }
 
-/* اسکرول‌بار */
 QScrollBar:vertical {
     background-color: #0F172A;
     width: 12px;
@@ -389,7 +378,6 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0;
 }
 
-/* پراگرس */
 QProgressBar {
     background-color: #334155;
     border: none;
@@ -403,7 +391,6 @@ QProgressBar::chunk {
     border-radius: 6px;
 }
 
-/* دیالوگ */
 QDialog {
     background-color: #0F172A;
 }
@@ -421,6 +408,9 @@ QMessageBox QPushButton {
 """
 
 
+# ═══════════════════════════════════════════════════════
+# صفحه Splash (بدون تغییر)
+# ═══════════════════════════════════════════════════════
 class SplashScreen(QWidget):
     def __init__(self):
         super().__init__()
@@ -500,7 +490,9 @@ class SplashScreen(QWidget):
         layout.addWidget(self.progress)
 
         self.status_label = QLabel("در حال آماده‌سازی...")
-        self.status_label.setStyleSheet("color: #E2E8F0; font-size: 14px; font-weight: 600; background-color: transparent;")
+        self.status_label.setStyleSheet(
+            "color: #E2E8F0; font-size: 14px; font-weight: 600; background-color: transparent;"
+        )
         self.status_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.status_label)
 
@@ -518,10 +510,190 @@ class SplashScreen(QWidget):
         QApplication.processEvents()
 
 
+# ═══════════════════════════════════════════════════════
+# دیالوگ Setup مستقل (اصلاح شده - پشت هیچ پنجره‌ای نمیره)
+# ═══════════════════════════════════════════════════════
+def show_setup_dialog_standalone(app, db):
+    """
+    دیالوگ نصب مستقل
+    splash قبلاً بسته شده پس پشت چیزی نمیره
+    بعد از بارگذاری خودش بسته میشه
+    """
+    dialog = QDialog()
+    dialog.setWindowTitle("راه‌اندازی اولیه - CyberWatch")
+    dialog.setLayoutDirection(Qt.RightToLeft)
+    dialog.setMinimumWidth(580)
+    dialog.setMinimumHeight(350)
+    dialog.setWindowFlags(Qt.Dialog | Qt.WindowStaysOnTopHint)
+    dialog.setStyleSheet("""
+        QDialog {
+            background-color: #0F172A;
+        }
+    """)
+
+    result = {'done': False}
+
+    layout = QVBoxLayout(dialog)
+    layout.setContentsMargins(35, 35, 35, 35)
+    layout.setSpacing(22)
+
+    # هدر
+    title = QLabel("🔍 CyberWatch")
+    title.setStyleSheet("""
+        font-size: 30px;
+        font-weight: 900;
+        color: #60A5FA;
+        padding: 15px;
+    """)
+    title.setAlignment(Qt.AlignCenter)
+    layout.addWidget(title)
+
+    subtitle = QLabel("برای شروع، فایل اکسل دیتابیس را انتخاب کنید")
+    subtitle.setAlignment(Qt.AlignCenter)
+    subtitle.setStyleSheet("color: #94A3B8; font-size: 15px; padding: 8px;")
+    layout.addWidget(subtitle)
+
+    # پراگرس بار (مخفی)
+    progress = QProgressBar()
+    progress.setMinimum(0)
+    progress.setMaximum(0)
+    progress.setFixedHeight(28)
+    progress.setStyleSheet("""
+        QProgressBar {
+            background-color: #334155;
+            border: 2px solid #475569;
+            border-radius: 12px;
+            height: 28px;
+        }
+        QProgressBar::chunk {
+            background-color: #2563EB;
+            border-radius: 10px;
+        }
+    """)
+    progress.hide()
+    layout.addWidget(progress)
+
+    # لیبل وضعیت (مخفی)
+    status_label = QLabel("")
+    status_label.setAlignment(Qt.AlignCenter)
+    status_label.setStyleSheet("color: #10B981; font-size: 14px; font-weight: 700;")
+    status_label.hide()
+    layout.addWidget(status_label)
+
+    # دکمه انتخاب فایل
+    btn = QPushButton("📂  انتخاب فایل اکسل")
+    btn.setObjectName("primaryButton")
+    btn.setMinimumHeight(55)
+    btn.setStyleSheet("""
+        QPushButton {
+            background-color: #2563EB;
+            color: white;
+            border: none;
+            font-weight: 700;
+            font-size: 16px;
+            border-radius: 10px;
+        }
+        QPushButton:hover {
+            background-color: #1D4ED8;
+        }
+        QPushButton:disabled {
+            background-color: #475569;
+            color: #94A3B8;
+        }
+    """)
+    layout.addWidget(btn)
+
+    # دکمه رد کردن
+    skip_btn = QPushButton("رد کردن (شروع با دیتابیس خالی)")
+    skip_btn.setMinimumHeight(42)
+    skip_btn.setStyleSheet("""
+        QPushButton {
+            background-color: #334155;
+            color: #F1F5F9;
+            border: 1px solid #475569;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background-color: #475569;
+        }
+        QPushButton:disabled {
+            background-color: #1E293B;
+            color: #64748B;
+        }
+    """)
+    layout.addWidget(skip_btn)
+
+    layout.addStretch()
+
+    # منطق بارگذاری
+    def load_excel():
+        file_path, _ = QFileDialog.getOpenFileName(
+            dialog, "انتخاب فایل اکسل", "", "Excel Files (*.xlsx *.xls)"
+        )
+        if not file_path:
+            return
+
+        btn.setEnabled(False)
+        skip_btn.setEnabled(False)
+        btn.setText("⏳  در حال بارگذاری...")
+        progress.show()
+        status_label.setText("در حال خواندن فایل...")
+        status_label.setStyleSheet("color: #60A5FA; font-size: 14px; font-weight: 700;")
+        status_label.show()
+        app.processEvents()
+
+        try:
+            total = db.import_excel(file_path)
+            progress.hide()
+            status_label.setText("✅ {:,} رکورد با موفقیت بارگذاری شد!".format(total))
+            status_label.setStyleSheet("color: #10B981; font-size: 15px; font-weight: 700;")
+            app.processEvents()
+
+            time.sleep(1.5)
+
+            result['done'] = True
+            dialog.accept()
+
+        except Exception as e:
+            progress.hide()
+            btn.setEnabled(True)
+            skip_btn.setEnabled(True)
+            btn.setText("📂  انتخاب فایل اکسل")
+            status_label.setText("❌ خطا: " + str(e))
+            status_label.setStyleSheet("color: #EF4444; font-size: 13px; font-weight: 700;")
+            status_label.show()
+            app.processEvents()
+
+    def skip_setup():
+        db.create_tables()
+        result['done'] = True
+        dialog.accept()
+
+    btn.clicked.connect(load_excel)
+    skip_btn.clicked.connect(skip_setup)
+
+    # وسط صفحه
+    screen = app.primaryScreen().geometry()
+    x = (screen.width() - dialog.width()) // 2
+    y = (screen.height() - dialog.height()) // 2
+    dialog.move(x, y)
+
+    dialog.raise_()
+    dialog.activateWindow()
+    dialog.exec_()
+
+    return result['done']
+
+
+# ═══════════════════════════════════════════════════════
+# کلاس اصلی برنامه (اصلاح شده)
+# ═══════════════════════════════════════════════════════
 class CyberWatchApp(QMainWindow):
-    def __init__(self):
+    def __init__(self, db):
         super().__init__()
-        self.db = Database()
+        self.db = db
         self.edit_id = None
 
         self.setWindowTitle("CyberWatch v8.0 - سامانه هوشمند")
@@ -529,69 +701,13 @@ class CyberWatchApp(QMainWindow):
         self.resize(1500, 900)
         self.setMinimumSize(1300, 750)
 
-        if not self.db.is_ready():
-            self.show_setup_dialog()
-
         self.setup_ui()
         self.show_dashboard()
-
-    def show_setup_dialog(self):
-        dialog = QDialog(self)
-        dialog.setWindowTitle("راه‌اندازی اولیه")
-        dialog.setLayoutDirection(Qt.RightToLeft)
-        dialog.setMinimumWidth(550)
-
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(20)
-
-        title = QLabel("🔍 CyberWatch")
-        title.setStyleSheet("font-size: 28px; font-weight: 900; color: #60A5FA; padding: 15px;")
-        title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
-
-        info = QLabel("برای شروع، فایل اکسل دیتابیس را انتخاب کنید")
-        info.setAlignment(Qt.AlignCenter)
-        info.setStyleSheet("color: #94A3B8; font-size: 15px; padding: 10px;")
-        layout.addWidget(info)
-
-        btn = QPushButton("📂 انتخاب فایل اکسل")
-        btn.setObjectName("primaryButton")
-        btn.setMinimumHeight(50)
-        btn.clicked.connect(lambda: self.load_excel_dialog(dialog))
-        layout.addWidget(btn)
-
-        skip_btn = QPushButton("رد کردن (شروع با دیتابیس خالی)")
-        skip_btn.setMinimumHeight(40)
-        skip_btn.clicked.connect(lambda: [self.db.create_tables(), dialog.accept()])
-        layout.addWidget(skip_btn)
-
-        dialog.exec_()
-
-    def load_excel_dialog(self, parent_dialog=None):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "انتخاب فایل اکسل",
-            "", "Excel Files (*.xlsx *.xls)"
-        )
-        if file_path:
-            try:
-                total = self.db.import_excel(file_path)
-                QMessageBox.information(
-                    self, "موفق",
-                    "✅ {:,} رکورد بارگذاری شد!".format(total)
-                )
-                if parent_dialog:
-                    parent_dialog.accept()
-                if hasattr(self, 'stack'):
-                    self.show_dashboard()
-            except Exception as e:
-                QMessageBox.critical(self, "خطا", "خطا در بارگذاری:\n" + str(e))
 
     def get_subjects_list(self):
         return DEFAULT_SUBJECTS
 
     def get_clean_subject_stats(self):
-        """آمار موضوعات پاک شده (بدون ترکیب) بر اساس لیست نهایی"""
         if not self.db.is_ready():
             return []
 
@@ -601,21 +717,15 @@ class CyberWatchApp(QMainWindow):
         ).fetchall()
         conn.close()
 
-        # شمارش هر موضوع اصلی
         subject_counts = {s: 0 for s in DEFAULT_SUBJECTS if s}
 
         for row in rows:
             subj = row['subject']
-            # اگر ترکیبی بود، جدا کن
             parts = [s.strip() for s in subj.split('|')]
             for part in parts:
                 if part in subject_counts:
                     subject_counts[part] += 1
-                else:
-                    # اگر موضوع در لیست نبود، اضافه نکن
-                    pass
 
-        # مرتب‌سازی بر اساس تعداد
         result = [(s, c) for s, c in subject_counts.items() if c > 0]
         result.sort(key=lambda x: x[1], reverse=True)
         return result
@@ -708,7 +818,9 @@ class CyberWatchApp(QMainWindow):
         layout.addStretch()
 
         self.records_label = QLabel("کل رکوردها: 0")
-        self.records_label.setStyleSheet("color: #60A5FA; padding: 20px; font-weight: 700; font-size: 15px;")
+        self.records_label.setStyleSheet(
+            "color: #60A5FA; padding: 20px; font-weight: 700; font-size: 15px;"
+        )
         self.records_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.records_label)
 
@@ -875,7 +987,9 @@ class CyberWatchApp(QMainWindow):
             row.addWidget(bar, 4)
 
             count = QLabel(str(cnt))
-            count.setStyleSheet("color: " + color + "; font-weight: 900; font-size: 16px; padding: 5px 15px;")
+            count.setStyleSheet(
+                "color: " + color + "; font-weight: 900; font-size: 16px; padding: 5px 15px;"
+            )
             row.addWidget(count, 1)
 
             old_layout.addWidget(row_widget)
@@ -924,7 +1038,9 @@ class CyberWatchApp(QMainWindow):
             row.addWidget(bar, 4)
 
             count = QLabel("{:,}".format(cnt))
-            count.setStyleSheet("color: " + color + "; font-weight: 900; font-size: 16px; padding: 5px 15px;")
+            count.setStyleSheet(
+                "color: " + color + "; font-weight: 900; font-size: 16px; padding: 5px 15px;"
+            )
             row.addWidget(count, 1)
 
             old_layout.addWidget(row_widget)
@@ -1009,7 +1125,9 @@ class CyberWatchApp(QMainWindow):
         layout.addWidget(search_card)
 
         self.search_count = QLabel("")
-        self.search_count.setStyleSheet("color: #10B981; font-weight: 700; padding: 8px; font-size: 15px;")
+        self.search_count.setStyleSheet(
+            "color: #10B981; font-weight: 700; padding: 8px; font-size: 15px;"
+        )
         layout.addWidget(self.search_count)
 
         self.search_table = self.create_results_table()
@@ -1066,7 +1184,10 @@ class CyberWatchApp(QMainWindow):
 
         name = "{} {}".format(rec.get('first_name', ''), rec.get('last_name', ''))
         title = QLabel("👤 " + name)
-        title.setStyleSheet("font-size: 24px; font-weight: 900; color: #60A5FA; padding: 15px; background-color: #1E293B; border-radius: 10px;")
+        title.setStyleSheet(
+            "font-size: 24px; font-weight: 900; color: #60A5FA; padding: 15px; "
+            "background-color: #1E293B; border-radius: 10px;"
+        )
         layout.addWidget(title)
 
         instagram_id = rec.get('instagram_id', '')
@@ -1131,11 +1252,16 @@ class CyberWatchApp(QMainWindow):
                 row.setContentsMargins(5, 5, 5, 5)
 
                 lbl = QLabel(fa + ":")
-                lbl.setStyleSheet("color: #94A3B8; font-weight: 700; min-width: 170px; font-size: 14px;")
+                lbl.setStyleSheet(
+                    "color: #94A3B8; font-weight: 700; min-width: 170px; font-size: 14px;"
+                )
                 row.addWidget(lbl)
 
                 val_lbl = QLabel(str(val))
-                val_lbl.setStyleSheet("color: #F1F5F9; padding: 10px 14px; background: #334155; border-radius: 8px; font-size: 14px; font-weight: 500;")
+                val_lbl.setStyleSheet(
+                    "color: #F1F5F9; padding: 10px 14px; background: #334155; "
+                    "border-radius: 8px; font-size: 14px; font-weight: 500;"
+                )
                 val_lbl.setWordWrap(True)
                 row.addWidget(val_lbl, 1)
 
@@ -1268,7 +1394,9 @@ class CyberWatchApp(QMainWindow):
         layout.addLayout(btn_row)
 
         self.adv_count = QLabel("")
-        self.adv_count.setStyleSheet("color: #10B981; font-weight: 700; padding: 8px; font-size: 15px;")
+        self.adv_count.setStyleSheet(
+            "color: #10B981; font-weight: 700; padding: 8px; font-size: 15px;"
+        )
         layout.addWidget(self.adv_count)
 
         self.adv_table = self.create_results_table()
@@ -1545,7 +1673,9 @@ class CyberWatchApp(QMainWindow):
         ))
 
         self.list_count = QLabel("")
-        self.list_count.setStyleSheet("color: #60A5FA; font-weight: 700; padding: 8px; font-size: 15px;")
+        self.list_count.setStyleSheet(
+            "color: #60A5FA; font-weight: 700; padding: 8px; font-size: 15px;"
+        )
         layout.addWidget(self.list_count)
 
         self.list_table = self.create_results_table()
@@ -1613,25 +1743,30 @@ class CyberWatchApp(QMainWindow):
 
         tabs = QTabWidget()
 
+        # تب بارگذاری مجدد
         reload_tab = QWidget()
         reload_layout = QVBoxLayout(reload_tab)
         reload_layout.setContentsMargins(20, 20, 20, 20)
         reload_layout.setSpacing(15)
 
         warn = QLabel("⚠️  توجه: بارگذاری مجدد، تمام داده‌های فعلی را جایگزین می‌کند")
-        warn.setStyleSheet("color: #F59E0B; padding: 15px; font-size: 14px; font-weight: 600; background-color: #78350F; border-radius: 8px;")
+        warn.setStyleSheet(
+            "color: #F59E0B; padding: 15px; font-size: 14px; font-weight: 600; "
+            "background-color: #78350F; border-radius: 8px;"
+        )
         reload_layout.addWidget(warn)
 
         reload_btn = QPushButton("📂  انتخاب و بارگذاری فایل اکسل")
         reload_btn.setObjectName("primaryButton")
         reload_btn.setMinimumHeight(50)
         reload_btn.setStyleSheet("font-size: 15px;")
-        reload_btn.clicked.connect(lambda: self.load_excel_dialog())
+        reload_btn.clicked.connect(self.reload_excel_from_settings)
         reload_layout.addWidget(reload_btn)
         reload_layout.addStretch()
 
         tabs.addTab(reload_tab, "📂  بارگذاری مجدد")
 
+        # تب درباره
         about_tab = QWidget()
         about_layout = QVBoxLayout(about_tab)
         about_layout.setContentsMargins(20, 20, 20, 20)
@@ -1640,7 +1775,12 @@ class CyberWatchApp(QMainWindow):
         for s in DEFAULT_SUBJECTS:
             if s:
                 color = SUBJECT_COLORS.get(s, "#60A5FA")
-                subjects_html += "<span style='background-color:" + color + "; color:white; padding:5px 12px; border-radius:12px; margin:3px; display:inline-block; font-weight:600; font-size:12px;'>● " + s + "</span> "
+                subjects_html += (
+                    "<span style='background-color:" + color +
+                    "; color:white; padding:5px 12px; border-radius:12px; "
+                    "margin:3px; display:inline-block; font-weight:600; "
+                    "font-size:12px;'>● " + s + "</span> "
+                )
 
         about_text = QLabel(
             "<div style='line-height: 2;'>"
@@ -1662,7 +1802,8 @@ class CyberWatchApp(QMainWindow):
             "<div style='padding: 10px;'>" + subjects_html + "</div>"
             "<hr style='border-color:#334155;'>"
             "<p style='color:#94A3B8;'><b>مسیر دیتابیس:</b><br>"
-            "<code style='color: #60A5FA; background-color:#1E293B; padding:5px;'>" + self.db.db_path + "</code></p>"
+            "<code style='color: #60A5FA; background-color:#1E293B; padding:5px;'>"
+            + self.db.db_path + "</code></p>"
             "</div>"
         )
         about_text.setWordWrap(True)
@@ -1678,6 +1819,86 @@ class CyberWatchApp(QMainWindow):
         layout.addWidget(tabs)
 
         return page
+
+    def reload_excel_from_settings(self):
+        """بارگذاری مجدد اکسل از تنظیمات - بدون هنگ"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "انتخاب فایل اکسل", "", "Excel Files (*.xlsx *.xls)"
+        )
+        if not file_path:
+            return
+
+        # دیالوگ لودینگ
+        loading = QDialog(self)
+        loading.setWindowTitle("در حال بارگذاری...")
+        loading.setLayoutDirection(Qt.RightToLeft)
+        loading.setFixedSize(400, 170)
+        loading.setWindowFlags(
+            Qt.Dialog | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint
+        )
+        loading.setStyleSheet("""
+            QDialog {
+                background-color: #1E293B;
+                border: 2px solid #2563EB;
+                border-radius: 15px;
+            }
+        """)
+
+        ll = QVBoxLayout(loading)
+        ll.setContentsMargins(30, 30, 30, 30)
+        ll.setSpacing(18)
+
+        lbl = QLabel("⏳  در حال بارگذاری فایل اکسل...")
+        lbl.setAlignment(Qt.AlignCenter)
+        lbl.setStyleSheet("font-size: 15px; font-weight: 700; color: #F1F5F9;")
+        ll.addWidget(lbl)
+
+        prog = QProgressBar()
+        prog.setMinimum(0)
+        prog.setMaximum(0)
+        prog.setFixedHeight(24)
+        prog.setStyleSheet("""
+            QProgressBar {
+                background-color: #334155;
+                border: none;
+                border-radius: 10px;
+                height: 24px;
+            }
+            QProgressBar::chunk {
+                background-color: #2563EB;
+                border-radius: 10px;
+            }
+        """)
+        ll.addWidget(prog)
+
+        # وسط صفحه
+        loading.move(
+            self.x() + (self.width() - 400) // 2,
+            self.y() + (self.height() - 170) // 2
+        )
+
+        loading.show()
+        QApplication.processEvents()
+
+        try:
+            total = self.db.import_excel(file_path)
+            loading.close()
+            loading.deleteLater()
+
+            QMessageBox.information(
+                self, "موفق",
+                "✅ {:,} رکورد با موفقیت بارگذاری شد!".format(total)
+            )
+            self.show_dashboard()
+
+        except Exception as e:
+            loading.close()
+            loading.deleteLater()
+
+            QMessageBox.critical(
+                self, "خطا",
+                "❌ خطا در بارگذاری:\n" + str(e)
+            )
 
     def show_dashboard(self):
         self.set_active_nav(0)
@@ -1706,29 +1927,45 @@ class CyberWatchApp(QMainWindow):
         self.stack.setCurrentIndex(5)
 
 
+# ═══════════════════════════════════════════════════════
+# نقطه شروع برنامه (اصلاح شده)
+# ═══════════════════════════════════════════════════════
 def main():
     app = QApplication(sys.argv)
     app.setStyleSheet(STYLE)
 
+    # ── مرحله ۱: Splash Screen ───────────────────────
     splash = SplashScreen()
     splash.show()
     QApplication.processEvents()
 
     steps = [
-        (15, "در حال بارگذاری کتابخانه‌ها..."),
-        (35, "در حال راه‌اندازی رابط کاربری..."),
-        (55, "در حال اتصال به دیتابیس..."),
-        (75, "در حال آماده‌سازی نهایی..."),
+        (20, "در حال بارگذاری کتابخانه‌ها..."),
+        (50, "در حال راه‌اندازی رابط کاربری..."),
+        (80, "در حال اتصال به دیتابیس..."),
         (100, "✅ آماده!"),
     ]
-
     for value, status in steps:
         splash.update_progress(value, status)
-        time.sleep(0.4)
+        time.sleep(0.3)
 
-    window = CyberWatchApp()
+    # ── مرحله ۲: بستن Splash ─────────────────────────
     splash.close()
+    splash.deleteLater()
+    QApplication.processEvents()
+
+    # ── مرحله ۳: Setup (اگر نیاز بود) ────────────────
+    db = Database()
+    if not db.is_ready():
+        setup_done = show_setup_dialog_standalone(app, db)
+        if not setup_done:
+            sys.exit(0)
+
+    # ── مرحله ۴: پنجره اصلی ──────────────────────────
+    window = CyberWatchApp(db)
     window.show()
+    window.raise_()
+    window.activateWindow()
 
     sys.exit(app.exec_())
 
