@@ -1,4 +1,4 @@
-name: Build CyberWatch Desktop PyQt5
+name: Build سامانه نظارت Desktop
 
 on:
   push:
@@ -18,14 +18,27 @@ jobs:
       with:
         python-version: '3.10'
     
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install PyQt5==5.15.10 pandas openpyxl pyinstaller
     
+    - name: Show file structure
+      run: |
+        Write-Host "📁 Files in repository:"
+        Get-ChildItem -Path . -File | Format-Table Name, Length
+    
     - name: Build EXE with PyInstaller
       run: |
-        pyinstaller --onedir --windowed --name "CyberWatch" `
+        pyinstaller --onedir --windowed --name "SamanehNezarat" `
           --add-data "database.py;." `
           --collect-all PyQt5 `
           --hidden-import PyQt5 `
@@ -36,26 +49,88 @@ jobs:
           --hidden-import openpyxl `
           --hidden-import sqlite3 `
           --hidden-import numpy `
+          --noconfirm `
           main.py
     
     - name: Verify build
       run: |
-        if (Test-Path "dist/CyberWatch/CyberWatch.exe") {
+        if (Test-Path "dist/SamanehNezarat/SamanehNezarat.exe") {
           Write-Host "✅ Build successful!"
-          $size = (Get-Item "dist/CyberWatch/CyberWatch.exe").Length / 1MB
-          Write-Host "📦 EXE Size: $([math]::Round($size, 2)) MB"
+          $exe = Get-Item "dist/SamanehNezarat/SamanehNezarat.exe"
+          $sizeMB = [math]::Round($exe.Length / 1MB, 2)
+          Write-Host "📦 EXE Size: $sizeMB MB"
+          
+          $totalSize = (Get-ChildItem "dist/SamanehNezarat" -Recurse | 
+                        Measure-Object -Property Length -Sum).Sum
+          $totalMB = [math]::Round($totalSize / 1MB, 2)
+          Write-Host "📦 Total Folder Size: $totalMB MB"
+          
+          $fileCount = (Get-ChildItem "dist/SamanehNezarat" -Recurse -File).Count
+          Write-Host "📁 Total Files: $fileCount"
         } else {
-          Write-Host "❌ Build failed!"
+          Write-Host "❌ Build failed! EXE not found"
+          Get-ChildItem "dist" -Recurse | Format-Table Name
           exit 1
         }
     
+    - name: Create README for users
+      run: |
+        $readme = @"
+        =====================================
+        سامانه کاربران تحت نظارت در فضای مجازی
+        نسخه 9.0
+        =====================================
+        
+        نحوه اجرا:
+        ----------
+        1. فایل SamanehNezarat.exe را اجرا کنید
+        2. در اولین اجرا، فایل اکسل دیتابیس را انتخاب کنید
+        3. برنامه آماده استفاده است
+        
+        امکانات:
+        --------
+        - جستجوی هوشمند
+        - جستجوی پیشرفته
+        - ثبت کاربر جدید (با فیلد فالوور)
+        - تحلیل هوشمند (یک موضوع، مقایسه، نمای کلی)
+        - بک‌آپ خودکار
+        - خروجی اکسل
+        
+        مسیر ذخیره اطلاعات:
+        ------------------
+        C:\Users\<UserName>\CyberWatchData\
+        
+        =====================================
+        "@
+        $readme | Out-File -FilePath "dist/SamanehNezarat/README.txt" -Encoding UTF8
+        Write-Host "✅ README created"
+    
     - name: Compress output
       run: |
-        Compress-Archive -Path "dist/CyberWatch/*" -DestinationPath "CyberWatch-Final.zip"
+        Write-Host "📦 Compressing files..."
+        Compress-Archive -Path "dist/SamanehNezarat/*" `
+          -DestinationPath "SamanehNezarat-v9.0.zip" `
+          -CompressionLevel Optimal
+        
+        $zip = Get-Item "SamanehNezarat-v9.0.zip"
+        $zipMB = [math]::Round($zip.Length / 1MB, 2)
+        Write-Host "✅ ZIP Size: $zipMB MB"
     
-    - name: Upload
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CyberWatch-Final
-        path: CyberWatch-Final.zip
+        name: SamanehNezarat-v9.0
+        path: SamanehNezarat-v9.0.zip
         retention-days: 30
+        compression-level: 0
+    
+    - name: Build Summary
+      run: |
+        Write-Host ""
+        Write-Host "════════════════════════════════════════"
+        Write-Host "  ✅ Build Complete!"
+        Write-Host "════════════════════════════════════════"
+        Write-Host "  📦 File: SamanehNezarat-v9.0.zip"
+        Write-Host "  📅 Retention: 30 days"
+        Write-Host "  ⬇️  Download from Actions > Artifacts"
+        Write-Host "════════════════════════════════════════"
