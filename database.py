@@ -1,18 +1,18 @@
 """
 سامانه کاربران تحت نظارت در فضای مجازی
-ماژول دیتابیس SQLite
-نسخه 9.0 - با پشتیبانی از فالوور و تحلیل هوشمند
+ماژول دیتابیس SQLite - نسخه 10.0
+با پشتیبانی از وضعیت اجتماعی، تشخیص تکراری و تکمیل هوشمند
 """
 import os
 import sqlite3
 import shutil
+import re
 from datetime import datetime
 import pandas as pd
 
 
 class Database:
     def __init__(self):
-        # مسیر دیتابیس
         self.base_dir = os.path.join(
             os.path.expanduser("~"), "CyberWatchData"
         )
@@ -22,20 +22,15 @@ class Database:
         self.backup_dir = os.path.join(self.base_dir, "backups")
         os.makedirs(self.backup_dir, exist_ok=True)
 
-        # اگر دیتابیس هست، migration انجام بده
         if os.path.exists(self.db_path):
             self._migrate_database()
 
-    # ═══════════════════════════════════════════════
-    # اتصال به دیتابیس
-    # ═══════════════════════════════════════════════
     def _conn(self):
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
 
     def is_ready(self):
-        """چک میکنه دیتابیس و جدول users وجود داره یا نه"""
         if not os.path.exists(self.db_path):
             return False
         try:
@@ -51,7 +46,7 @@ class Database:
             return False
 
     # ═══════════════════════════════════════════════
-    # ساخت جداول و Index ها
+    # ساخت جداول
     # ═══════════════════════════════════════════════
     def create_tables(self):
         conn = self._conn()
@@ -70,65 +65,69 @@ class Database:
                 address TEXT DEFAULT '',
                 reg_year TEXT DEFAULT '',
                 followers INTEGER DEFAULT 0,
+                family_status TEXT DEFAULT '',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # Index ها برای سرعت بالا
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_instagram "
-            "ON users(instagram_id)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_phone ON users(phone)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_subject ON users(subject)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_year ON users(reg_year)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_followers "
-            "ON users(followers)"
-        )
+        # Index ها
+        for idx_sql in [
+            "CREATE INDEX IF NOT EXISTS idx_instagram ON users(instagram_id)",
+            "CREATE INDEX IF NOT EXISTS idx_phone ON users(phone)",
+            "CREATE INDEX IF NOT EXISTS idx_subject ON users(subject)",
+            "CREATE INDEX IF NOT EXISTS idx_year ON users(reg_year)",
+            "CREATE INDEX IF NOT EXISTS idx_followers ON users(followers)",
+            "CREATE INDEX IF NOT EXISTS idx_national ON users(national_id)",
+            "CREATE INDEX IF NOT EXISTS idx_first_name ON users(first_name)",
+            "CREATE INDEX IF NOT EXISTS idx_last_name ON users(last_name)",
+        ]:
+            conn.execute(idx_sql)
 
         conn.commit()
         conn.close()
 
     # ═══════════════════════════════════════════════
-    # Migration - اضافه کردن ستون followers به دیتابیس قدیم
+    # Migration
     # ═══════════════════════════════════════════════
     def _migrate_database(self):
-        """اضافه کردن ستون followers اگر نداشته باشه"""
         try:
             conn = self._conn()
             cur = conn.execute("PRAGMA table_info(users)")
             columns = [row[1] for row in cur.fetchall()]
 
+            # اضافه کردن ستون‌های جدید
             if 'followers' not in columns:
                 conn.execute(
                     "ALTER TABLE users ADD COLUMN "
                     "followers INTEGER DEFAULT 0"
                 )
-                conn.commit()
                 print("✅ Migration: ستون followers اضافه شد")
 
-            # ساخت index ها اگر نیستن
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_followers "
-                "ON users(followers)"
-            )
+            if 'family_status' not in columns:
+                conn.execute(
+                    "ALTER TABLE users ADD COLUMN "
+                    "family_status TEXT DEFAULT ''"
+                )
+                print("✅ Migration: ستون family_status اضافه شد")
+
+            # Index ها
+            for idx_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_followers ON users(followers)",
+                "CREATE INDEX IF NOT EXISTS idx_national ON users(national_id)",
+                "CREATE INDEX IF NOT EXISTS idx_first_name ON users(first_name)",
+                "CREATE INDEX IF NOT EXISTS idx_last_name ON users(last_name)",
+            ]:
+                conn.execute(idx_sql)
+
             conn.commit()
             conn.close()
         except Exception as e:
             print("خطا در migration: " + str(e))
 
     # ═══════════════════════════════════════════════
-    # بک‌آپ خودکار
+    # بک‌آپ
     # ═══════════════════════════════════════════════
     def create_backup(self):
-        """گرفتن بک‌آپ از دیتابیس"""
         try:
             if not os.path.exists(self.db_path):
                 return None
@@ -138,8 +137,6 @@ class Database:
             backup_path = os.path.join(self.backup_dir, backup_name)
 
             shutil.copy2(self.db_path, backup_path)
-
-            # نگهداری فقط ۵ بک‌آپ آخر
             self._cleanup_old_backups(keep=5)
 
             return backup_path
@@ -148,7 +145,6 @@ class Database:
             return None
 
     def _cleanup_old_backups(self, keep=5):
-        """پاک کردن بک‌آپ‌های قدیمی"""
         try:
             files = [
                 f for f in os.listdir(self.backup_dir)
@@ -161,7 +157,6 @@ class Database:
             pass
 
     def get_backups_list(self):
-        """لیست بک‌آپ‌های موجود"""
         try:
             files = [
                 f for f in os.listdir(self.backup_dir)
@@ -173,7 +168,6 @@ class Database:
             return []
 
     def restore_backup(self, backup_name):
-        """بازیابی از بک‌آپ"""
         try:
             backup_path = os.path.join(self.backup_dir, backup_name)
             if os.path.exists(backup_path):
@@ -187,12 +181,9 @@ class Database:
     # Import از Excel
     # ═══════════════════════════════════════════════
     def import_excel(self, file_path):
-        """بارگذاری از فایل اکسل"""
-        # بک‌آپ قبل از تغییر
         if self.is_ready():
             self.create_backup()
 
-        # پاک کردن جدول قبلی و ساخت جدید
         conn = self._conn()
         conn.execute("DROP TABLE IF EXISTS users")
         conn.commit()
@@ -200,11 +191,9 @@ class Database:
 
         self.create_tables()
 
-        # خواندن اکسل
         df = pd.read_excel(file_path, dtype=str)
         df = df.fillna('')
 
-        # نگاشت ستون‌های اکسل به دیتابیس
         column_map = {
             'ایدی اینستاگرام': 'instagram_id',
             'آیدی اینستاگرام': 'instagram_id',
@@ -242,16 +231,17 @@ class Database:
             'فالوور': 'followers',
             'دنبال‌کننده': 'followers',
             'followers': 'followers',
+            'وضعیت خانواده': 'family_status',
+            'وضعیت اجتماعی': 'family_status',
+            'family_status': 'family_status',
         }
 
-        # تشخیص ستون‌ها
         detected_columns = {}
         for col in df.columns:
             col_clean = str(col).strip()
             if col_clean in column_map:
                 detected_columns[col] = column_map[col_clean]
 
-        # درج داده‌ها
         conn = self._conn()
         count = 0
 
@@ -269,15 +259,14 @@ class Database:
                 'address': '',
                 'reg_year': '',
                 'followers': 0,
+                'family_status': '',
             }
 
             for excel_col, db_col in detected_columns.items():
                 value = str(row[excel_col]).strip()
                 if value and value.lower() != 'nan':
                     if db_col == 'followers':
-                        # تبدیل به عدد
                         try:
-                            # حذف کاما و کاراکترهای اضافی
                             clean_val = value.replace(',', '').replace(' ', '')
                             data[db_col] = int(float(clean_val))
                         except Exception:
@@ -285,21 +274,25 @@ class Database:
                     else:
                         data[db_col] = value
 
-            # فقط اگر instagram_id داشت ذخیره کن
+            # استخراج سال از تاریخ اگه سال خالی بود
+            if not data['reg_year'] and data['reg_date']:
+                data['reg_year'] = self._extract_year(data['reg_date'])
+
             if data['instagram_id']:
                 conn.execute("""
                     INSERT INTO users (
                         instagram_id, first_name, last_name, father_name,
                         phone, national_id, subject, tarnama_code,
-                        reg_date, address, reg_year, followers
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        reg_date, address, reg_year, followers, family_status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     data['instagram_id'], data['first_name'],
                     data['last_name'], data['father_name'],
                     data['phone'], data['national_id'],
                     data['subject'], data['tarnama_code'],
                     data['reg_date'], data['address'],
-                    data['reg_year'], data['followers']
+                    data['reg_year'], data['followers'],
+                    data['family_status']
                 ))
                 count += 1
 
@@ -307,18 +300,23 @@ class Database:
         conn.close()
         return count
 
+    def _extract_year(self, date_str):
+        """استخراج سال از تاریخ (مثل 1403/05/15)"""
+        match = re.match(r'^(\d{4})', date_str.strip())
+        if match:
+            return match.group(1)
+        return ''
+
     # ═══════════════════════════════════════════════
-    # Export به Excel
+    # Export
     # ═══════════════════════════════════════════════
     def export_excel(self, file_path):
-        """خروجی به اکسل"""
         conn = self._conn()
         df = pd.read_sql_query(
             "SELECT * FROM users ORDER BY id DESC", conn
         )
         conn.close()
 
-        # نام‌های فارسی ستون‌ها
         df = df.rename(columns={
             'id': 'شناسه',
             'instagram_id': 'ایدی اینستاگرام',
@@ -333,6 +331,7 @@ class Database:
             'address': 'نشانی',
             'reg_year': 'سال ثبت',
             'followers': 'تعداد دنبال‌کننده',
+            'family_status': 'وضعیت خانواده',
             'created_at': 'تاریخ ایجاد',
         })
 
@@ -340,16 +339,21 @@ class Database:
         return len(df)
 
     # ═══════════════════════════════════════════════
-    # عملیات CRUD
+    # CRUD
     # ═══════════════════════════════════════════════
     def add_user(self, data):
+        # استخراج سال از تاریخ
+        reg_year = data.get('reg_year', '')
+        if not reg_year and data.get('reg_date'):
+            reg_year = self._extract_year(data['reg_date'])
+
         conn = self._conn()
         conn.execute("""
             INSERT INTO users (
                 instagram_id, first_name, last_name, father_name,
                 phone, national_id, subject, tarnama_code,
-                reg_date, address, reg_year, followers
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                reg_date, address, reg_year, followers, family_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('instagram_id', ''),
             data.get('first_name', ''),
@@ -361,20 +365,25 @@ class Database:
             data.get('tarnama_code', ''),
             data.get('reg_date', ''),
             data.get('address', ''),
-            data.get('reg_year', ''),
+            reg_year,
             int(data.get('followers', 0) or 0),
+            data.get('family_status', ''),
         ))
         conn.commit()
         conn.close()
 
     def update_user(self, user_id, data):
+        reg_year = data.get('reg_year', '')
+        if not reg_year and data.get('reg_date'):
+            reg_year = self._extract_year(data['reg_date'])
+
         conn = self._conn()
         conn.execute("""
             UPDATE users SET
                 instagram_id=?, first_name=?, last_name=?,
                 father_name=?, phone=?, national_id=?,
                 subject=?, tarnama_code=?, reg_date=?,
-                address=?, reg_year=?, followers=?
+                address=?, reg_year=?, followers=?, family_status=?
             WHERE id=?
         """, (
             data.get('instagram_id', ''),
@@ -387,8 +396,9 @@ class Database:
             data.get('tarnama_code', ''),
             data.get('reg_date', ''),
             data.get('address', ''),
-            data.get('reg_year', ''),
+            reg_year,
             int(data.get('followers', 0) or 0),
+            data.get('family_status', ''),
             user_id
         ))
         conn.commit()
@@ -416,6 +426,231 @@ class Database:
         ).fetchall()
         conn.close()
         return [dict(r) for r in rows]
+
+    # ═══════════════════════════════════════════════
+    # 🔍 تشخیص تکراری (اولویت‌بندی شده)
+    # ═══════════════════════════════════════════════
+    def check_duplicate(self, national_id="", instagram_id="",
+                        first_name="", last_name="", exclude_id=None):
+        """
+        بررسی تکراری با اولویت:
+        1. کد ملی (دقیق)
+        2. ایدی اینستاگرام (دقیق + مشابه)
+        3. نام + نام خانوادگی (دقیق)
+        
+        خروجی: {
+            'has_duplicate': True/False,
+            'match_type': 'national_id' / 'instagram' / 'name',
+            'confidence': 'exact' / 'similar',
+            'matches': [رکوردهای مشابه]
+        }
+        """
+        conn = self._conn()
+
+        # اولویت ۱: کد ملی (اگه وارد شده)
+        if national_id and national_id.strip():
+            exclude_sql = ""
+            params = [national_id.strip()]
+            if exclude_id:
+                exclude_sql = " AND id != ?"
+                params.append(exclude_id)
+
+            rows = conn.execute(
+                "SELECT * FROM users WHERE national_id = ?" + exclude_sql,
+                params
+            ).fetchall()
+
+            if rows:
+                conn.close()
+                return {
+                    'has_duplicate': True,
+                    'match_type': 'national_id',
+                    'confidence': 'exact',
+                    'message': 'کد ملی تکراری است',
+                    'matches': [dict(r) for r in rows]
+                }
+
+        # اولویت ۲: ایدی اینستاگرام (دقیق)
+        if instagram_id and instagram_id.strip():
+            ig_clean = instagram_id.strip().lower().replace('@', '')
+
+            exclude_sql = ""
+            params = [ig_clean]
+            if exclude_id:
+                exclude_sql = " AND id != ?"
+                params.append(exclude_id)
+
+            # چک دقیق
+            rows = conn.execute(
+                "SELECT * FROM users WHERE LOWER(instagram_id) = ?" +
+                exclude_sql,
+                params
+            ).fetchall()
+
+            if rows:
+                conn.close()
+                return {
+                    'has_duplicate': True,
+                    'match_type': 'instagram',
+                    'confidence': 'exact',
+                    'message': 'ایدی اینستاگرام تکراری است',
+                    'matches': [dict(r) for r in rows]
+                }
+
+            # چک مشابه (Fuzzy Match)
+            similar = self._fuzzy_match_instagram(
+                ig_clean, exclude_id, threshold=2
+            )
+            if similar:
+                conn.close()
+                return {
+                    'has_duplicate': True,
+                    'match_type': 'instagram',
+                    'confidence': 'similar',
+                    'message': 'ایدی اینستاگرام مشابه یافت شد',
+                    'matches': similar
+                }
+
+        # اولویت ۳: نام + نام خانوادگی
+        if first_name and last_name and first_name.strip() and last_name.strip():
+            exclude_sql = ""
+            params = [first_name.strip(), last_name.strip()]
+            if exclude_id:
+                exclude_sql = " AND id != ?"
+                params.append(exclude_id)
+
+            rows = conn.execute(
+                "SELECT * FROM users WHERE first_name = ? AND last_name = ?" +
+                exclude_sql,
+                params
+            ).fetchall()
+
+            if rows:
+                conn.close()
+                return {
+                    'has_duplicate': True,
+                    'match_type': 'name',
+                    'confidence': 'exact',
+                    'message': 'نام و نام خانوادگی تکراری است',
+                    'matches': [dict(r) for r in rows]
+                }
+
+        conn.close()
+        return {
+            'has_duplicate': False,
+            'match_type': None,
+            'confidence': None,
+            'message': '',
+            'matches': []
+        }
+
+    def _fuzzy_match_instagram(self, target, exclude_id=None, threshold=2):
+        """
+        پیدا کردن ایدی‌های مشابه (با حداکثر N کاراکتر اختلاف)
+        از الگوریتم Levenshtein Distance استفاده میکنه
+        """
+        conn = self._conn()
+
+        exclude_sql = ""
+        params = []
+        if exclude_id:
+            exclude_sql = " WHERE id != ?"
+            params.append(exclude_id)
+
+        rows = conn.execute(
+            "SELECT * FROM users" + exclude_sql,
+            params
+        ).fetchall()
+        conn.close()
+
+        matches = []
+        target_lower = target.lower()
+
+        for r in rows:
+            ig = r['instagram_id'].lower().replace('@', '')
+            if not ig or ig == target_lower:
+                continue
+
+            # اگه طول‌ها خیلی فرق دارن، رد کن
+            if abs(len(ig) - len(target_lower)) > threshold:
+                continue
+
+            distance = self._levenshtein(ig, target_lower)
+            if 0 < distance <= threshold:
+                match = dict(r)
+                match['_distance'] = distance
+                matches.append(match)
+
+        # مرتب بر اساس شباهت
+        matches.sort(key=lambda x: x['_distance'])
+        return matches[:5]  # حداکثر ۵ مورد
+
+    def _levenshtein(self, s1, s2):
+        """محاسبه فاصله Levenshtein بین دو رشته"""
+        if len(s1) < len(s2):
+            return self._levenshtein(s2, s1)
+
+        if len(s2) == 0:
+            return len(s1)
+
+        previous_row = range(len(s2) + 1)
+        for i, c1 in enumerate(s1):
+            current_row = [i + 1]
+            for j, c2 in enumerate(s2):
+                insertions = previous_row[j + 1] + 1
+                deletions = current_row[j] + 1
+                substitutions = previous_row[j] + (c1 != c2)
+                current_row.append(
+                    min(insertions, deletions, substitutions)
+                )
+            previous_row = current_row
+
+        return previous_row[-1]
+
+    # ═══════════════════════════════════════════════
+    # 💡 تکمیل هوشمند (Auto-Complete)
+    # ═══════════════════════════════════════════════
+    def get_suggestions(self, field, partial_text="", limit=10):
+        """
+        پیشنهاد بر اساس داده‌های موجود
+        field: first_name, last_name, father_name, subject, address
+        """
+        if field not in ['first_name', 'last_name', 'father_name',
+                         'subject', 'address', 'instagram_id']:
+            return []
+
+        conn = self._conn()
+
+        if partial_text:
+            rows = conn.execute(
+                "SELECT DISTINCT " + field + " FROM users WHERE " +
+                field + " LIKE ? AND " + field + " != '' " +
+                "ORDER BY " + field + " LIMIT ?",
+                ("%" + partial_text + "%", limit)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT DISTINCT " + field + " FROM users WHERE " +
+                field + " != '' ORDER BY " + field + " LIMIT ?",
+                (limit,)
+            ).fetchall()
+
+        conn.close()
+        return [r[field] for r in rows]
+
+    def get_all_unique_values(self, field):
+        """گرفتن همه مقادیر منحصر به فرد یک فیلد"""
+        if field not in ['first_name', 'last_name', 'father_name',
+                         'subject', 'address', 'instagram_id']:
+            return []
+
+        conn = self._conn()
+        rows = conn.execute(
+            "SELECT DISTINCT " + field + " FROM users WHERE " +
+            field + " != '' ORDER BY " + field
+        ).fetchall()
+        conn.close()
+        return [r[field] for r in rows]
 
     # ═══════════════════════════════════════════════
     # جستجو
@@ -482,7 +717,7 @@ class Database:
         return [dict(r) for r in rows]
 
     # ═══════════════════════════════════════════════
-    # آمار عمومی
+    # آمار
     # ═══════════════════════════════════════════════
     def get_stats(self):
         conn = self._conn()
@@ -491,18 +726,19 @@ class Database:
             "SELECT COUNT(*) as c FROM users"
         ).fetchone()['c']
 
-        # آمار سال‌ها
+        # آمار سال‌های واقعی موجود (فقط سال‌های یکتا)
         years_rows = conn.execute("""
             SELECT reg_year, COUNT(*) as c FROM users
             WHERE reg_year != ''
-            GROUP BY reg_year ORDER BY reg_year DESC
+            GROUP BY reg_year
+            ORDER BY reg_year DESC
         """).fetchall()
         years = [(r['reg_year'], r['c']) for r in years_rows]
 
         # فیلدهای پر شده
         filled = {}
         for field in ['phone', 'instagram_id', 'national_id',
-                      'address', 'followers']:
+                      'address', 'followers', 'family_status']:
             if field == 'followers':
                 count = conn.execute(
                     "SELECT COUNT(*) as c FROM users WHERE followers > 0"
@@ -522,20 +758,17 @@ class Database:
         }
 
     # ═══════════════════════════════════════════════
-    # 🔬 توابع تحلیلی جدید
+    # تحلیل هوشمند (به‌روز شده با family_status)
     # ═══════════════════════════════════════════════
     def get_subject_analysis(self, subject):
-        """تحلیل کامل یک موضوع خاص"""
         conn = self._conn()
 
-        # همه رکوردهایی که این موضوع رو دارند (ترکیبی هم شامل)
         pattern = "%" + subject + "%"
-        rows = conn.execute("""
-            SELECT * FROM users
-            WHERE subject LIKE ?
-        """, (pattern,)).fetchall()
+        rows = conn.execute(
+            "SELECT * FROM users WHERE subject LIKE ?",
+            (pattern,)
+        ).fetchall()
 
-        # فیلتر دقیق: فقط کسانی که واقعاً این موضوع رو دارند
         matching = []
         for r in rows:
             parts = [s.strip() for s in r['subject'].split('|')]
@@ -546,7 +779,6 @@ class Database:
             conn.close()
             return None
 
-        # آمار فالوور
         followers_list = [
             r['followers'] for r in matching
             if r['followers'] and r['followers'] > 0
@@ -561,7 +793,6 @@ class Database:
         max_followers = max(followers_list) if followers_list else 0
         min_followers = min(followers_list) if followers_list else 0
 
-        # میانه
         median_followers = 0
         if followers_list:
             sorted_f = sorted(followers_list)
@@ -571,13 +802,8 @@ class Database:
             else:
                 median_followers = sorted_f[n//2]
 
-        # دسته‌بندی فالوور
         categories = {
-            'mega': 0,      # > 1M
-            'macro': 0,     # 100K - 1M
-            'middle': 0,    # 10K - 100K
-            'micro': 0,     # 1K - 10K
-            'nano': 0,      # < 1K
+            'mega': 0, 'macro': 0, 'middle': 0, 'micro': 0, 'nano': 0,
         }
         for f in followers_list:
             if f > 1000000:
@@ -591,14 +817,12 @@ class Database:
             else:
                 categories['nano'] += 1
 
-        # Top 10
         top_users = sorted(
             [r for r in matching if r['followers'] > 0],
             key=lambda x: x['followers'],
             reverse=True
         )[:10]
 
-        # توزیع سالانه
         year_dist = {}
         for r in matching:
             year = r['reg_year'] if r['reg_year'] else 'نامشخص'
@@ -607,7 +831,6 @@ class Database:
             year_dist.items(), key=lambda x: x[0], reverse=True
         )
 
-        # موضوعات مرتبط (چند موضوعه)
         related = {}
         for r in matching:
             parts = [s.strip() for s in r['subject'].split('|')]
@@ -618,12 +841,27 @@ class Database:
             related.items(), key=lambda x: x[1], reverse=True
         )[:10]
 
-        # کیفیت اطلاعات
+        # آمار وضعیت اجتماعی
+        family_stats = {}
+        for r in matching:
+            fs = r.get('family_status', '')
+            if fs:
+                parts = [s.strip() for s in fs.split('|')]
+                for p in parts:
+                    if p:
+                        family_stats[p] = family_stats.get(p, 0) + 1
+        family_stats_list = sorted(
+            family_stats.items(), key=lambda x: x[1], reverse=True
+        )
+
         quality = {
             'has_phone': sum(1 for r in matching if r['phone']),
             'has_national_id': sum(1 for r in matching if r['national_id']),
             'has_address': sum(1 for r in matching if r['address']),
             'has_followers': count_with_followers,
+            'has_family_status': sum(
+                1 for r in matching if r.get('family_status', '')
+            ),
         }
 
         conn.close()
@@ -641,11 +879,11 @@ class Database:
             'top_users': top_users,
             'year_distribution': year_dist_list,
             'related_subjects': related_list,
+            'family_stats': family_stats_list,
             'quality': quality,
         }
 
     def get_all_subjects_comparison(self, subjects_list):
-        """مقایسه همه موضوعات با هم"""
         results = []
         for subj in subjects_list:
             if not subj:
@@ -661,19 +899,16 @@ class Database:
                     'count_with_followers': analysis['count_with_followers'],
                 })
 
-        # مرتب بر اساس تعداد
         results.sort(key=lambda x: x['total'], reverse=True)
         return results
 
     def compare_two_subjects(self, subject1, subject2):
-        """مقایسه دو موضوع"""
         a1 = self.get_subject_analysis(subject1)
         a2 = self.get_subject_analysis(subject2)
 
         if not a1 or not a2:
             return None
 
-        # کسانی که هر دو موضوع رو دارند
         conn = self._conn()
         pattern1 = "%" + subject1 + "%"
         pattern2 = "%" + subject2 + "%"
