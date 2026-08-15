@@ -28,7 +28,7 @@ from database import Database
 # ═══════════════════════════════════════════════════════
 APP_NAME = "سامانه کاربران تحت نظارت در فضای مجازی"
 APP_SHORT_NAME = "سامانه نظارت"
-APP_VERSION = "10.0"
+APP_VERSION = "11.0"
 
 # سال‌های شمسی
 YEARS_LIST = [""] + [str(y) for y in range(1399, 1416)]
@@ -1256,11 +1256,14 @@ class SplashScreen(QWidget):
 # Setup Dialog
 # ═══════════════════════════════════════════════════════
 def show_setup_dialog_standalone(app, db):
+    """
+    دیالوگ نصب اولیه - اجباری برای بارگذاری دیتاست
+    """
     dialog = QDialog()
-    dialog.setWindowTitle("راه‌اندازی اولیه")
+    dialog.setWindowTitle("راه‌اندازی اولیه سامانه - الزامی")
     dialog.setLayoutDirection(Qt.RightToLeft)
-    dialog.setMinimumWidth(600)
-    dialog.setMinimumHeight(380)
+    dialog.setMinimumWidth(650)
+    dialog.setMinimumHeight(450)
     dialog.setWindowFlags(Qt.Dialog | Qt.WindowStaysOnTopHint)
     dialog.setStyleSheet("QDialog { background-color: #0F172A; }")
 
@@ -1268,8 +1271,9 @@ def show_setup_dialog_standalone(app, db):
 
     layout = QVBoxLayout(dialog)
     layout.setContentsMargins(35, 30, 35, 30)
-    layout.setSpacing(18)
+    layout.setSpacing(15)
 
+    # لوگو و عنوان
     title = QLabel("🛡️ " + APP_SHORT_NAME)
     title.setStyleSheet(
         "font-size: 26px; font-weight: 900; color: #60A5FA; padding: 10px;"
@@ -1277,13 +1281,45 @@ def show_setup_dialog_standalone(app, db):
     title.setAlignment(Qt.AlignCenter)
     layout.addWidget(title)
 
-    subtitle = QLabel("برای شروع، فایل اکسل دیتابیس را انتخاب کنید")
+    # هشدار امنیتی
+    security_notice = QFrame()
+    security_notice.setStyleSheet(
+        "background-color: #78350F; border: 2px solid #F59E0B; "
+        "border-radius: 10px; padding: 12px;"
+    )
+    sn_layout = QVBoxLayout(security_notice)
+    sn_layout.setSpacing(5)
+
+    sn_title = QLabel("🔒 اطلاعات امنیتی مهم")
+    sn_title.setStyleSheet(
+        "color: #FCD34D; font-size: 14px; font-weight: 900; "
+        "background-color: transparent;"
+    )
+    sn_layout.addWidget(sn_title)
+
+    sn_text = QLabel(
+        "این سامانه حاوی اطلاعات محرمانه است.\n"
+        "برای شروع کار، حتماً باید فایل اکسل دیتابیس اصلی را بارگذاری کنید.\n"
+        "بدون بارگذاری دیتاست، برنامه اجرا نخواهد شد."
+    )
+    sn_text.setStyleSheet(
+        "color: #FEF3C7; font-size: 12px; font-weight: 600; "
+        "background-color: transparent;"
+    )
+    sn_text.setWordWrap(True)
+    sn_layout.addWidget(sn_text)
+
+    layout.addWidget(security_notice)
+
+    # زیرنویس
+    subtitle = QLabel("📂 لطفاً فایل اکسل دیتابیس را انتخاب کنید:")
     subtitle.setAlignment(Qt.AlignCenter)
     subtitle.setStyleSheet(
-        "color: #94A3B8; font-size: 14px; padding: 5px;"
+        "color: #94A3B8; font-size: 14px; padding: 8px;"
     )
     layout.addWidget(subtitle)
 
+    # پراگرس بار
     progress = QProgressBar()
     progress.setMinimum(0)
     progress.setMaximum(0)
@@ -1302,6 +1338,7 @@ def show_setup_dialog_standalone(app, db):
     progress.hide()
     layout.addWidget(progress)
 
+    # پیام وضعیت
     status_label = QLabel("")
     status_label.setAlignment(Qt.AlignCenter)
     status_label.setStyleSheet(
@@ -1310,8 +1347,9 @@ def show_setup_dialog_standalone(app, db):
     status_label.hide()
     layout.addWidget(status_label)
 
-    btn = QPushButton("📂  انتخاب فایل اکسل")
-    btn.setMinimumHeight(52)
+    # دکمه انتخاب فایل
+    btn = QPushButton("📂  انتخاب فایل اکسل دیتابیس")
+    btn.setMinimumHeight(54)
     btn.setStyleSheet("""
         QPushButton {
             background-color: #2563EB;
@@ -1329,33 +1367,34 @@ def show_setup_dialog_standalone(app, db):
     """)
     layout.addWidget(btn)
 
-    skip_btn = QPushButton("رد کردن (شروع با دیتابیس خالی)")
-    skip_btn.setMinimumHeight(40)
-    skip_btn.setStyleSheet("""
+    # دکمه خروج
+    exit_btn = QPushButton("❌  خروج از برنامه")
+    exit_btn.setMinimumHeight(40)
+    exit_btn.setStyleSheet("""
         QPushButton {
-            background-color: #334155;
-            color: #F1F5F9;
-            border: 1px solid #475569;
+            background-color: #7F1D1D;
+            color: white;
+            border: 1px solid #DC2626;
             border-radius: 10px;
             font-size: 13px;
             font-weight: 600;
         }
-        QPushButton:hover { background-color: #475569; }
+        QPushButton:hover { background-color: #991B1B; }
     """)
-    layout.addWidget(skip_btn)
+    layout.addWidget(exit_btn)
 
     layout.addStretch()
 
     def load_excel():
         file_path, _ = QFileDialog.getOpenFileName(
-            dialog, "انتخاب فایل اکسل", "",
+            dialog, "انتخاب فایل اکسل دیتابیس", "",
             "Excel Files (*.xlsx *.xls)"
         )
         if not file_path:
             return
 
         btn.setEnabled(False)
-        skip_btn.setEnabled(False)
+        exit_btn.setEnabled(False)
         btn.setText("⏳  در حال بارگذاری...")
         progress.show()
         status_label.setText("در حال خواندن فایل...")
@@ -1367,6 +1406,10 @@ def show_setup_dialog_standalone(app, db):
 
         try:
             total = db.import_excel(file_path)
+
+            if total == 0:
+                raise Exception("فایل اکسل خالی است یا فرمت نامعتبر دارد")
+
             progress.hide()
             status_label.setText(
                 "✅ {:,} رکورد با موفقیت بارگذاری شد!".format(total)
@@ -1382,8 +1425,8 @@ def show_setup_dialog_standalone(app, db):
         except Exception as e:
             progress.hide()
             btn.setEnabled(True)
-            skip_btn.setEnabled(True)
-            btn.setText("📂  انتخاب فایل اکسل")
+            exit_btn.setEnabled(True)
+            btn.setText("📂  انتخاب فایل اکسل دیتابیس")
             status_label.setText("❌ خطا: " + str(e))
             status_label.setStyleSheet(
                 "color: #EF4444; font-size: 12px; font-weight: 700;"
@@ -1391,13 +1434,12 @@ def show_setup_dialog_standalone(app, db):
             status_label.show()
             app.processEvents()
 
-    def skip_setup():
-        db.create_tables()
-        result['done'] = True
-        dialog.accept()
+    def exit_app():
+        result['done'] = False
+        dialog.reject()
 
     btn.clicked.connect(load_excel)
-    skip_btn.clicked.connect(skip_setup)
+    exit_btn.clicked.connect(exit_app)
 
     screen = app.primaryScreen().geometry()
     x = (screen.width() - dialog.width()) // 2
@@ -1409,7 +1451,6 @@ def show_setup_dialog_standalone(app, db):
     dialog.exec_()
 
     return result['done']
-
 
 # ═══════════════════════════════════════════════════════
 # ⚠️ دیالوگ هشدار تکراری (حرفه‌ای)
@@ -4794,6 +4835,7 @@ def main():
     app.setApplicationName(APP_NAME)
     app.setStyleSheet(STYLE)
 
+    # ─── مرحله ۱: Splash ───────────────────────────
     splash = SplashScreen()
     splash.show()
     QApplication.processEvents()
@@ -4812,12 +4854,26 @@ def main():
     splash.deleteLater()
     QApplication.processEvents()
 
+    # ─── مرحله ۲: بررسی دیتابیس ────────────────────
     db = Database()
+
+    # اگر دیتابیس آماده نیست، حتماً باید Excel بارگذاری بشه
     if not db.is_ready():
         setup_done = show_setup_dialog_standalone(app, db)
-        if not setup_done:
+
+        # بعد از دیالوگ، دوباره چک کنیم
+        if not db.is_ready():
+            # کاربر بارگذاری نکرد
+            QMessageBox.critical(
+                None,
+                "خطا در راه‌اندازی",
+                "🔒 برنامه بدون بارگذاری فایل دیتابیس اجرا نمی‌شود.\n\n"
+                "لطفاً برنامه را دوباره اجرا کرده و فایل دیتابیس اکسل را "
+                "بارگذاری کنید."
+            )
             sys.exit(0)
 
+    # ─── مرحله ۳: پنجره اصلی ───────────────────────
     window = CyberWatchApp(db)
     window.show()
     window.raise_()
