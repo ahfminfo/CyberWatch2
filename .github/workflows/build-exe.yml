@@ -1,4 +1,4 @@
-name: Build سامانه نظارت v10.0
+name: Build سامانه نظارت v11.0 - Setup Installer
 
 on:
   push:
@@ -10,28 +10,160 @@ jobs:
     runs-on: windows-latest
     
     steps:
+    # ═══════════════════════════════════════════════
+    # مرحله ۱: Checkout
+    # ═══════════════════════════════════════════════
     - name: Checkout code
       uses: actions/checkout@v4
     
+    # ═══════════════════════════════════════════════
+    # مرحله ۲: Setup Python
+    # ═══════════════════════════════════════════════
     - name: Setup Python 3.10
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
     
+    # ═══════════════════════════════════════════════
+    # مرحله ۳: Cache
+    # ═══════════════════════════════════════════════
     - name: Cache pip packages
       uses: actions/cache@v4
       with:
         path: ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-pip-v10-${{ hashFiles('**/requirements.txt') }}
+        key: ${{ runner.os }}-pip-v11-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
-          ${{ runner.os }}-pip-v10-
+          ${{ runner.os }}-pip-v11-
           ${{ runner.os }}-pip-
     
-    - name: Install dependencies
+    # ═══════════════════════════════════════════════
+    # مرحله ۴: نصب Dependencies
+    # ═══════════════════════════════════════════════
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install PyQt5==5.15.10 pandas openpyxl pyinstaller
+        pip install PyQt5==5.15.10 pandas openpyxl pyinstaller Pillow
     
+    # ═══════════════════════════════════════════════
+    # مرحله ۵: نصب Inno Setup
+    # ═══════════════════════════════════════════════
+    - name: Install Inno Setup
+      run: |
+        Write-Host "📦 Downloading Inno Setup..."
+        $url = "https://files.jrsoftware.org/is/6/innosetup-6.2.2.exe"
+        $output = "$env:TEMP\innosetup.exe"
+        Invoke-WebRequest -Uri $url -OutFile $output
+        
+        Write-Host "🔧 Installing Inno Setup..."
+        Start-Process -FilePath $output -Args "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-" -Wait
+        
+        Write-Host "✅ Inno Setup installed"
+        
+        # اضافه کردن به PATH
+        $innoPath = "C:\Program Files (x86)\Inno Setup 6"
+        echo $innoPath | Out-File -FilePath $env:GITHUB_PATH -Append
+        
+        # چک نصب
+        if (Test-Path "$innoPath\ISCC.exe") {
+          Write-Host "✅ ISCC.exe found at: $innoPath\ISCC.exe"
+        } else {
+          Write-Host "❌ ISCC.exe not found!"
+          exit 1
+        }
+    
+    # ═══════════════════════════════════════════════
+    # مرحله ۶: ساخت آیکون
+    # ═══════════════════════════════════════════════
+    - name: Generate Icon
+      run: |
+        Write-Host "🎨 Creating application icon..."
+        
+        $iconScript = @'
+        from PIL import Image, ImageDraw
+        
+        # ابعاد مختلف برای ICO
+        sizes = [16, 32, 48, 64, 128, 256]
+        images = []
+        
+        for size in sizes:
+            # ایجاد تصویر با پس‌زمینه شفاف
+            img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            
+            # رسم دایره پس‌زمینه (آبی تیره)
+            margin = size // 16
+            draw.ellipse(
+                [margin, margin, size - margin, size - margin],
+                fill=(37, 99, 235, 255),  # آبی
+                outline=(96, 165, 250, 255),
+                width=max(1, size // 32)
+            )
+            
+            # رسم سپر داخل دایره (سفید)
+            shield_margin = size // 4
+            shield_top = shield_margin
+            shield_bottom = size - shield_margin
+            shield_left = shield_margin + size // 12
+            shield_right = size - shield_margin - size // 12
+            shield_mid_x = size // 2
+            
+            # نقاط سپر
+            shield_points = [
+                (shield_left, shield_top + size // 12),
+                (shield_right, shield_top + size // 12),
+                (shield_right, shield_top + (shield_bottom - shield_top) * 2 // 3),
+                (shield_mid_x, shield_bottom),
+                (shield_left, shield_top + (shield_bottom - shield_top) * 2 // 3),
+            ]
+            
+            draw.polygon(shield_points, fill=(255, 255, 255, 240))
+            
+            # رسم علامت تیک داخل سپر
+            check_size = size // 4
+            check_x = shield_mid_x - check_size // 2
+            check_y = size // 2 - check_size // 4
+            
+            check_points = [
+                (check_x, check_y + check_size // 3),
+                (check_x + check_size // 3, check_y + check_size * 2 // 3),
+                (check_x + check_size, check_y),
+            ]
+            
+            draw.line(
+                check_points,
+                fill=(37, 99, 235, 255),
+                width=max(2, size // 24),
+                joint="curve"
+            )
+            
+            images.append(img)
+        
+        # ذخیره ICO با چند سایز
+        images[0].save(
+            'icon.ico',
+            format='ICO',
+            sizes=[(s, s) for s in sizes],
+            append_images=images[1:]
+        )
+        
+        print("✅ Icon created successfully")
+        print(f"📦 Size: {sum(1 for s in sizes)} resolutions")
+        '@
+        
+        $iconScript | Out-File -FilePath "create_icon.py" -Encoding UTF8
+        python create_icon.py
+        
+        if (Test-Path "icon.ico") {
+          $iconSize = (Get-Item "icon.ico").Length / 1KB
+          Write-Host "✅ Icon file: icon.ico ($([math]::Round($iconSize, 2)) KB)"
+        } else {
+          Write-Host "❌ Icon creation failed"
+          exit 1
+        }
+    
+    # ═══════════════════════════════════════════════
+    # مرحله ۷: نمایش ساختار
+    # ═══════════════════════════════════════════════
     - name: Show file structure
       run: |
         Write-Host "📁 Repository files:"
@@ -41,12 +173,19 @@ jobs:
         python --version
         Write-Host ""
         Write-Host "📦 Installed packages:"
-        pip list | Select-String -Pattern "PyQt5|pandas|openpyxl|pyinstaller"
+        pip list | Select-String -Pattern "PyQt5|pandas|openpyxl|pyinstaller|Pillow"
     
+    # ═══════════════════════════════════════════════
+    # مرحله ۸: Build EXE با PyInstaller
+    # ═══════════════════════════════════════════════
     - name: Build EXE with PyInstaller
       run: |
+        Write-Host "🔨 Building EXE..."
+        
         pyinstaller --onedir --windowed --name "SamanehNezarat" `
+          --icon "icon.ico" `
           --add-data "database.py;." `
+          --add-data "icon.ico;." `
           --collect-all PyQt5 `
           --hidden-import PyQt5 `
           --hidden-import PyQt5.QtCore `
@@ -62,11 +201,14 @@ jobs:
           --noconfirm `
           main.py
     
+    # ═══════════════════════════════════════════════
+    # مرحله ۹: تأیید Build
+    # ═══════════════════════════════════════════════
     - name: Verify build
       run: |
         if (Test-Path "dist/SamanehNezarat/SamanehNezarat.exe") {
           Write-Host "════════════════════════════════════════"
-          Write-Host "  ✅ Build successful!"
+          Write-Host "  ✅ EXE Build successful!"
           Write-Host "════════════════════════════════════════"
           
           $exe = Get-Item "dist/SamanehNezarat/SamanehNezarat.exe"
@@ -82,100 +224,204 @@ jobs:
           Write-Host "📁 Total Files: $fileCount"
           Write-Host "════════════════════════════════════════"
         } else {
-          Write-Host "❌ Build failed! EXE not found"
-          Write-Host "Files in dist:"
+          Write-Host "❌ EXE Build failed!"
           Get-ChildItem "dist" -Recurse | Format-Table Name, Length
           exit 1
         }
     
-    - name: Create README for users
+    # ═══════════════════════════════════════════════
+    # مرحله ۱۰: ساخت README
+    # ═══════════════════════════════════════════════
+    - name: Create README
       run: |
         $readme = @"
         ================================================
         سامانه کاربران تحت نظارت در فضای مجازی
-        نسخه 10.0 Enterprise Edition
+        نسخه 11.0 - Enterprise Edition
         ================================================
         
-        نحوه اجرا:
-        ----------
-        1. فایل SamanehNezarat.exe را اجرا کنید
-        2. در اولین اجرا، فایل اکسل دیتابیس را انتخاب کنید
-        3. برنامه آماده استفاده است
+        این نسخه شامل نصب‌کننده حرفه‌ای است.
         
-        ویژگی‌های نسخه 10.0:
+        نحوه نصب:
+        --------
+        1. فایل SamanehNezarat-Setup-v11.0.exe را اجرا کنید
+        2. مراحل نصب را دنبال کنید
+        3. آیکون روی دسکتاپ ایجاد می‌شود
+        4. برنامه از Start Menu نیز قابل دسترسی است
+        
+        در اولین اجرا:
+        -------------
+        - سامانه از شما فایل اکسل دیتابیس می‌خواهد
+        - این کار الزامی است و بدون آن برنامه اجرا نمی‌شود
+        - فایل اکسل باید شامل ستون‌های زیر باشد:
+          * ایدی اینستاگرام (الزامی)
+          * نام
+          * نام خانوادگی
+          * نام پدر
+          * شماره تماس
+          * شماره ملی
+          * موضوع
+          * تعداد دنبال‌کننده
+          * تاریخ ثبت
+          * نشانی
+          * کد تارنما
+        
+        ویژگی‌های نسخه 11.0:
         --------------------
-        - تشخیص هوشمند رکوردهای تکراری (کد ملی، ایدی، نام)
+        - نصب‌کننده حرفه‌ای (Setup.exe)
+        - آیکون روی دسکتاپ و Start Menu
+        - Uninstaller خودکار
+        - سوال درباره حفظ/حذف داده‌های قبلی
+        - تفکیک هوشمند سال‌های ترکیبی در آمار
+        - تشخیص هوشمند رکوردهای تکراری
         - تکمیل هوشمند خودکار نام‌ها
         - تقویم شمسی داخلی
         - اعتبارسنجی کد ملی ایرانی
-        - Validator های تخصصی برای هر فیلد
+        - Validator های تخصصی
         - وضعیت اجتماعی-اقتصادی
-        - تحلیل هوشمند موضوعات (تک، مقایسه، کلی)
-        - نمای مقایسه‌ای دو موضوع
+        - تحلیل هوشمند موضوعات
         - بک‌آپ خودکار دیتابیس
         - خروجی اکسل حرفه‌ای
-        - Auto-Complete در فرم‌ها
-        - استخراج خودکار سال از تاریخ
-        
-        محدودیت‌های ورودی:
-        ------------------
-        - کد ملی: فقط 10 رقم عددی
-        - شماره تماس: 11 رقم شروع با 0
-        - نام/نام خانوادگی/نام پدر: فقط حروف فارسی
-        - ایدی اینستاگرام: حروف، عدد، نقطه، آندرلاین
-        - کد تارنما: عدد، حرف، / و \\
-        - تعداد فالوور: فقط عدد
-        - تاریخ: فرمت 1403/05/15
         
         مسیر ذخیره اطلاعات:
         -------------------
-        C:\Users\<UserName>\CyberWatchData\
+        C:\ProgramData\SamanehNezarat\
+        (این مسیر مخفی است. برای دسترسی:
+         Start → Run → type: %ProgramData%\SamanehNezarat)
         
         بک‌آپ‌ها:
         --------
-        C:\Users\<UserName>\CyberWatchData\backups\
-        (5 بک‌آپ آخر نگه داشته می‌شود)
+        C:\ProgramData\SamanehNezarat\backups\
+        
+        Uninstall:
+        ----------
+        از Control Panel > Programs یا Start Menu
+        هنگام Uninstall، از شما درباره حذف داده‌ها پرسیده می‌شود
         
         ================================================
         "@
-        $readme | Out-File -FilePath "dist/SamanehNezarat/README.txt" -Encoding UTF8
+        $readme | Out-File -FilePath "README.txt" -Encoding UTF8
         Write-Host "✅ README created"
     
-    - name: Compress output
+    # ═══════════════════════════════════════════════
+    # مرحله ۱۱: Build Setup Installer
+    # ═══════════════════════════════════════════════
+    - name: Build Setup Installer with Inno Setup
       run: |
-        Write-Host "📦 Compressing files..."
-        Compress-Archive -Path "dist/SamanehNezarat/*" `
-          -DestinationPath "SamanehNezarat-v10.0.zip" `
-          -CompressionLevel Optimal
+        Write-Host "🔨 Building Setup Installer..."
+        Write-Host "════════════════════════════════════════"
         
-        $zip = Get-Item "SamanehNezarat-v10.0.zip"
-        $zipMB = [math]::Round($zip.Length / 1MB, 2)
-        Write-Host "✅ ZIP Size: $zipMB MB"
+        $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+        
+        if (-not (Test-Path $isccPath)) {
+          Write-Host "❌ ISCC.exe not found!"
+          exit 1
+        }
+        
+        & $isccPath "installer.iss"
+        
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "════════════════════════════════════════"
+          Write-Host "  ✅ Setup Installer created!"
+          Write-Host "════════════════════════════════════════"
+          
+          Get-ChildItem -Path "." -Filter "*.exe" | ForEach-Object {
+            $sizeMB = [math]::Round($_.Length / 1MB, 2)
+            Write-Host "📦 $($_.Name): $sizeMB MB"
+          }
+        } else {
+          Write-Host "❌ Setup build failed!"
+          exit 1
+        }
     
-    - name: Upload artifact
+    # ═══════════════════════════════════════════════
+    # مرحله ۱۲: تأیید Setup
+    # ═══════════════════════════════════════════════
+    - name: Verify Setup file
+      run: |
+        $setupFile = "SamanehNezarat-Setup-v11.0.exe"
+        
+        if (Test-Path $setupFile) {
+          $setup = Get-Item $setupFile
+          $sizeMB = [math]::Round($setup.Length / 1MB, 2)
+          
+          Write-Host "════════════════════════════════════════"
+          Write-Host "  ✅ Setup file ready!"
+          Write-Host "════════════════════════════════════════"
+          Write-Host "  📦 File: $setupFile"
+          Write-Host "  💾 Size: $sizeMB MB"
+          Write-Host "  📅 Created: $($setup.CreationTime)"
+          Write-Host "════════════════════════════════════════"
+        } else {
+          Write-Host "❌ Setup file not found!"
+          Get-ChildItem -Path . -Filter "*.exe" | Format-Table
+          exit 1
+        }
+    
+    # ═══════════════════════════════════════════════
+    # مرحله ۱۳: آپلود Setup
+    # ═══════════════════════════════════════════════
+    - name: Upload Setup Installer
       uses: actions/upload-artifact@v4
       with:
-        name: SamanehNezarat-v10.0
-        path: SamanehNezarat-v10.0.zip
+        name: SamanehNezarat-Setup-v11.0
+        path: SamanehNezarat-Setup-v11.0.exe
+        retention-days: 90
+        compression-level: 0
+    
+    # ═══════════════════════════════════════════════
+    # مرحله ۱۴: آپلود Portable (اختیاری)
+    # ═══════════════════════════════════════════════
+    - name: Create Portable ZIP
+      run: |
+        Write-Host "📦 Creating portable ZIP..."
+        Compress-Archive -Path "dist/SamanehNezarat/*" `
+          -DestinationPath "SamanehNezarat-Portable-v11.0.zip" `
+          -CompressionLevel Optimal
+        
+        $zip = Get-Item "SamanehNezarat-Portable-v11.0.zip"
+        $zipMB = [math]::Round($zip.Length / 1MB, 2)
+        Write-Host "✅ Portable ZIP Size: $zipMB MB"
+    
+    - name: Upload Portable ZIP
+      uses: actions/upload-artifact@v4
+      with:
+        name: SamanehNezarat-Portable-v11.0
+        path: SamanehNezarat-Portable-v11.0.zip
         retention-days: 30
         compression-level: 0
     
+    # ═══════════════════════════════════════════════
+    # مرحله ۱۵: خلاصه نهایی
+    # ═══════════════════════════════════════════════
     - name: Build Summary
       run: |
         Write-Host ""
         Write-Host "════════════════════════════════════════"
-        Write-Host "  ✅ Build Complete!"
-        Write-Host "  🎯 Version: 10.0 Enterprise"
-        Write-Host "════════════════════════════════════════"
-        Write-Host "  📦 File: SamanehNezarat-v10.0.zip"
-        Write-Host "  📅 Retention: 30 days"
-        Write-Host "  ⬇️  Download from Actions > Artifacts"
+        Write-Host "  🎉 Build Complete! v11.0"
         Write-Host "════════════════════════════════════════"
         Write-Host ""
-        Write-Host "  ✨ New Features:"
-        Write-Host "    • Duplicate detection"
-        Write-Host "    • Auto-complete"
-        Write-Host "    • Persian calendar"
-        Write-Host "    • Family status tracking"
-        Write-Host "    • Enterprise validators"
+        Write-Host "  📦 Available Downloads:"
+        Write-Host ""
+        Write-Host "  1️⃣ SamanehNezarat-Setup-v11.0 (Installer)"
+        Write-Host "     ✅ Professional installer"
+        Write-Host "     ✅ Desktop shortcut"
+        Write-Host "     ✅ Start Menu entry"
+        Write-Host "     ✅ Uninstaller included"
+        Write-Host "     ✅ Recommended for end users"
+        Write-Host ""
+        Write-Host "  2️⃣ SamanehNezarat-Portable-v11.0 (ZIP)"
+        Write-Host "     ✅ No installation needed"
+        Write-Host "     ✅ Run from any folder"
+        Write-Host "     ✅ For testing purposes"
+        Write-Host ""
+        Write-Host "  🎯 New Features in v11.0:"
+        Write-Host "     • Setup.exe installer"
+        Write-Host "     • Desktop & Start Menu icons"
+        Write-Host "     • Mandatory dataset upload"
+        Write-Host "     • Year splitting (combined years)"
+        Write-Host "     • Data preservation dialog"
+        Write-Host ""
+        Write-Host "  ⬇️ Download from:"
+        Write-Host "     Actions > This workflow > Artifacts"
         Write-Host "════════════════════════════════════════"
