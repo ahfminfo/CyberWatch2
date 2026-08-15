@@ -1,4 +1,4 @@
-name: Build سامانه نظارت v11.1 - Merge Feature
+name: Build سامانه نظارت v11.2 - Merge Feature
 
 on:
   push:
@@ -217,12 +217,12 @@ jobs:
       run: |
         $readme = @"
         ================================================
-        Samaneh Nezarat v11.1
+        Samaneh Nezarat v11.2
         Dataset Merge Feature Added
         ================================================
         
         Installation:
-        1. Run SamanehNezarat-Setup-v11.1.exe
+        1. Run SamanehNezarat-Setup-v11.2.exe
         2. Follow the installation wizard
         3. Desktop icon will be created
         
@@ -230,7 +230,7 @@ jobs:
         - You must load an Excel database file
         - Without dataset, the app won't run
         
-        New in v11.1:
+        New in v11.2:
         - Dataset Merge Feature
         - Update existing records without losing data
         - Add new users automatically
@@ -289,7 +289,7 @@ jobs:
     # ═══════════════════════════════════════════════
     - name: Verify Setup file
       run: |
-        $setupFile = "SamanehNezarat-Setup-v11.1.exe"
+        $setupFile = "SamanehNezarat-Setup-v11.2.exe"
         
         if (Test-Path $setupFile) {
           $setup = Get-Item $setupFile
@@ -307,8 +307,8 @@ jobs:
     - name: Upload Setup Installer
       uses: actions/upload-artifact@v4
       with:
-        name: SamanehNezarat-Setup-v11.1
-        path: SamanehNezarat-Setup-v11.1.exe
+        name: SamanehNezarat-Setup-v11.2
+        path: SamanehNezarat-Setup-v11.2.exe
         retention-days: 90
         compression-level: 0
     
@@ -318,18 +318,18 @@ jobs:
     - name: Create Portable ZIP
       run: |
         Compress-Archive -Path "dist/SamanehNezarat/*" `
-          -DestinationPath "SamanehNezarat-Portable-v11.1.zip" `
+          -DestinationPath "SamanehNezarat-Portable-v11.2.zip" `
           -CompressionLevel Optimal
         
-        $zip = Get-Item "SamanehNezarat-Portable-v11.1.zip"
+        $zip = Get-Item "SamanehNezarat-Portable-v11.2.zip"
         $zipMB = [math]::Round($zip.Length / 1MB, 2)
         Write-Host "✅ Portable ZIP: $zipMB MB"
     
     - name: Upload Portable ZIP
       uses: actions/upload-artifact@v4
       with:
-        name: SamanehNezarat-Portable-v11.1
-        path: SamanehNezarat-Portable-v11.1.zip
+        name: SamanehNezarat-Portable-v11.2
+        path: SamanehNezarat-Portable-v11.2.zip
         retention-days: 30
         compression-level: 0
     
@@ -340,7 +340,7 @@ jobs:
       run: |
         Write-Host ""
         Write-Host "════════════════════════════════════════"
-        Write-Host "  🎉 Build Complete! v11.1"
+        Write-Host "  🎉 Build Complete! v11.2"
         Write-Host "════════════════════════════════════════"
         Write-Host "  🆕 New Feature: Dataset Merge"
         Write-Host ""
