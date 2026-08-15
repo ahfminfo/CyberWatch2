@@ -354,6 +354,236 @@ class Database:
             return match.group(1)
         return ''
 
+    # ═══════════════════════════════════════════════
+    # 🔄 ادغام دیتاست جدید (Merge)
+    # ═══════════════════════════════════════════════
+    def merge_excel(self, file_path):
+        """
+        ادغام فایل اکسل جدید با دیتابیس موجود
+        بدون پاک کردن داده‌های قبلی
+        
+        منطق:
+        - اگر ایدی موجود بود → بروزرسانی
+        - اگر ایدی جدید بود → اضافه
+        - فیلدهای تجمیعی: موضوع، تاریخ ثبت، سال ثبت
+        """
+        # بک‌آپ قبل از ادغام
+        if os.path.exists(self.db_path):
+            self.create_backup()
+
+        # خواندن اکسل
+        df = pd.read_excel(file_path, dtype=str)
+        df = df.fillna('')
+
+        column_map = {
+            'ایدی اینستاگرام': 'instagram_id',
+            'آیدی اینستاگرام': 'instagram_id',
+            'اینستاگرام': 'instagram_id',
+            'instagram_id': 'instagram_id',
+            'نام': 'first_name',
+            'first_name': 'first_name',
+            'نام خانوادگی': 'last_name',
+            'last_name': 'last_name',
+            'نام پدر': 'father_name',
+            'father_name': 'father_name',
+            'شماره تماس': 'phone',
+            'موبایل': 'phone',
+            'phone': 'phone',
+            'شماره ملی': 'national_id',
+            'کد ملی': 'national_id',
+            'national_id': 'national_id',
+            'موضوع': 'subject',
+            'موضوع ثبت': 'subject',
+            'subject': 'subject',
+            'کد تارنما': 'tarnama_code',
+            'تارنما': 'tarnama_code',
+            'tarnama_code': 'tarnama_code',
+            'تاریخ ثبت': 'reg_date',
+            'تاریخ': 'reg_date',
+            'reg_date': 'reg_date',
+            'نشانی': 'address',
+            'آدرس': 'address',
+            'address': 'address',
+            'سال ثبت': 'reg_year',
+            'سال': 'reg_year',
+            'reg_year': 'reg_year',
+            'تعداد دنبال‌کننده': 'followers',
+            'تعداد دنبال کننده': 'followers',
+            'فالوور': 'followers',
+            'دنبال‌کننده': 'followers',
+            'followers': 'followers',
+            'وضعیت خانواده': 'family_status',
+            'وضعیت اجتماعی': 'family_status',
+            'family_status': 'family_status',
+        }
+
+        detected_columns = {}
+        for col in df.columns:
+            col_clean = str(col).strip()
+            if col_clean in column_map:
+                detected_columns[col] = column_map[col_clean]
+
+        # آمار عملیات
+        stats = {
+            'total_rows': len(df),
+            'new_users': 0,
+            'updated_users': 0,
+            'skipped': 0,
+        }
+
+        conn = self._conn()
+
+        for _, row in df.iterrows():
+            new_data = {
+                'instagram_id': '',
+                'first_name': '',
+                'last_name': '',
+                'father_name': '',
+                'phone': '',
+                'national_id': '',
+                'subject': '',
+                'tarnama_code': '',
+                'reg_date': '',
+                'address': '',
+                'reg_year': '',
+                'followers': 0,
+                'family_status': '',
+            }
+
+            for excel_col, db_col in detected_columns.items():
+                value = str(row[excel_col]).strip()
+                if value and value.lower() != 'nan':
+                    if db_col == 'followers':
+                        try:
+                            clean_val = value.replace(',', '').replace(' ', '')
+                            new_data[db_col] = int(float(clean_val))
+                        except Exception:
+                            new_data[db_col] = 0
+                    else:
+                        new_data[db_col] = value
+
+            # اگر ایدی نداشت، رد کن
+            if not new_data['instagram_id']:
+                stats['skipped'] += 1
+                continue
+
+            # استخراج سال از تاریخ
+            if not new_data['reg_year'] and new_data['reg_date']:
+                new_data['reg_year'] = self._extract_year(new_data['reg_date'])
+
+            # چک کن آیا کاربر موجود هست
+            existing = conn.execute(
+                "SELECT * FROM users WHERE LOWER(instagram_id) = LOWER(?)",
+                (new_data['instagram_id'],)
+            ).fetchone()
+
+            if existing:
+                # 🔄 کاربر موجود → بروزرسانی
+                existing_dict = dict(existing)
+                merged = self._merge_user(existing_dict, new_data)
+
+                conn.execute("""
+                    UPDATE users SET
+                        first_name=?, last_name=?, father_name=?,
+                        phone=?, national_id=?, subject=?,
+                        tarnama_code=?, reg_date=?, address=?,
+                        reg_year=?, followers=?, family_status=?
+                    WHERE id=?
+                """, (
+                    merged['first_name'],
+                    merged['last_name'],
+                    merged['father_name'],
+                    merged['phone'],
+                    merged['national_id'],
+                    merged['subject'],
+                    merged['tarnama_code'],
+                    merged['reg_date'],
+                    merged['address'],
+                    merged['reg_year'],
+                    merged['followers'],
+                    merged['family_status'],
+                    existing_dict['id']
+                ))
+                stats['updated_users'] += 1
+            else:
+                # 🆕 کاربر جدید → اضافه
+                conn.execute("""
+                    INSERT INTO users (
+                        instagram_id, first_name, last_name, father_name,
+                        phone, national_id, subject, tarnama_code,
+                        reg_date, address, reg_year, followers, family_status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    new_data['instagram_id'],
+                    new_data['first_name'],
+                    new_data['last_name'],
+                    new_data['father_name'],
+                    new_data['phone'],
+                    new_data['national_id'],
+                    new_data['subject'],
+                    new_data['tarnama_code'],
+                    new_data['reg_date'],
+                    new_data['address'],
+                    new_data['reg_year'],
+                    new_data['followers'],
+                    new_data['family_status']
+                ))
+                stats['new_users'] += 1
+
+        conn.commit()
+        conn.close()
+
+        return stats
+
+    def _merge_user(self, existing, new_data):
+        """
+        ادغام هوشمند اطلاعات کاربر
+        - فیلدهای معمولی: اگه جدید پر بود → جایگزین کن
+                        اگه جدید خالی بود → قدیم حفظ کن
+        - فیلدهای تجمیعی: با | ادغام کن
+        """
+        merged = existing.copy()
+
+        # فیلدهای بروزرسانی شونده (Update)
+        update_fields = [
+            'first_name', 'last_name', 'father_name',
+            'phone', 'national_id', 'tarnama_code',
+            'address', 'family_status'
+        ]
+
+        for field in update_fields:
+            new_val = str(new_data.get(field, '')).strip()
+            if new_val:  # فقط اگه مقدار جدید داشتیم
+                merged[field] = new_val
+            # در غیر این صورت، مقدار قدیمی حفظ میشه
+
+        # فالوور: اگه عدد جدید بزرگتر بود، جایگزین کن
+        new_followers = int(new_data.get('followers', 0) or 0)
+        if new_followers > 0:
+            merged['followers'] = new_followers
+
+        # فیلدهای تجمیعی (Append with |)
+        append_fields = ['subject', 'reg_date', 'reg_year']
+
+        for field in append_fields:
+            new_val = str(new_data.get(field, '')).strip()
+            if new_val:
+                existing_val = str(merged.get(field, '')).strip()
+                if existing_val:
+                    # چک کن آیا مقدار جدید در قدیم موجود هست
+                    existing_parts = [
+                        p.strip() for p in existing_val.split('|')
+                    ]
+                    if new_val not in existing_parts:
+                        # اضافه کن
+                        merged[field] = existing_val + ' | ' + new_val
+                    # اگه تکراری بود، دست نزن
+                else:
+                    merged[field] = new_val
+
+        return merged
+        
+    
     def _split_years(self, year_str):
         """
         تفکیک سال‌های ترکیبی
