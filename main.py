@@ -28,7 +28,7 @@ from database import Database
 # ═══════════════════════════════════════════════════════
 APP_NAME = "سامانه کاربران تحت نظارت در فضای مجازی"
 APP_SHORT_NAME = "سامانه نظارت"
-APP_VERSION = "11.0"
+APP_VERSION = "11.1"
 
 # سال‌های شمسی
 YEARS_LIST = [""] + [str(y) for y in range(1399, 1416)]
@@ -4548,32 +4548,106 @@ class CyberWatchApp(QMainWindow):
 
         tabs = QTabWidget()
 
-        # تب بارگذاری مجدد
+        # تب بارگذاری مجدد + ادغام
         reload_tab = QWidget()
         reload_layout = QVBoxLayout(reload_tab)
         reload_layout.setContentsMargins(20, 20, 20, 20)
         reload_layout.setSpacing(15)
 
-        warn = QLabel(
-            "⚠️  توجه: بارگذاری مجدد، تمام داده‌های فعلی را جایگزین می‌کند "
-            "(بک‌آپ خودکار قبل از عملیات گرفته می‌شود)"
+        # ═══ گروه ۱: بارگذاری از صفر ═══
+        fresh_group = QGroupBox("🗑️ بارگذاری از صفر (پاک و شروع تازه)")
+        fresh_layout = QVBoxLayout(fresh_group)
+        fresh_layout.setSpacing(10)
+        fresh_layout.setContentsMargins(15, 20, 15, 15)
+
+        warn_fresh = QLabel(
+            "⚠️  توجه: تمام داده‌های فعلی حذف و با داده‌های جدید "
+            "جایگزین می‌شود.\n(بک‌آپ خودکار قبل از عملیات گرفته می‌شود)"
         )
-        warn.setStyleSheet(
-            "color: #F59E0B; padding: 15px; font-size: 13px; "
+        warn_fresh.setStyleSheet(
+            "color: #F59E0B; padding: 12px; font-size: 12px; "
             "font-weight: 600; background-color: #78350F; border-radius: 8px;"
         )
-        warn.setWordWrap(True)
-        reload_layout.addWidget(warn)
+        warn_fresh.setWordWrap(True)
+        fresh_layout.addWidget(warn_fresh)
 
-        reload_btn = QPushButton("📂  انتخاب و بارگذاری فایل اکسل")
-        reload_btn.setObjectName("primaryButton")
-        reload_btn.setMinimumHeight(48)
+        reload_btn = QPushButton("📂  انتخاب و بارگذاری کامل فایل اکسل")
+        reload_btn.setObjectName("dangerButton")
+        reload_btn.setMinimumHeight(46)
         reload_btn.setStyleSheet("font-size: 14px;")
         reload_btn.clicked.connect(self.reload_excel_from_settings)
-        reload_layout.addWidget(reload_btn)
+        fresh_layout.addWidget(reload_btn)
 
+        reload_layout.addWidget(fresh_group)
+
+        # ═══ گروه ۲: ادغام و بروزرسانی ═══
+        merge_group = QGroupBox(
+            "🔄 بروزرسانی و ادغام دیتاست جدید (بدون حذف داده‌های موجود)"
+        )
+        merge_layout = QVBoxLayout(merge_group)
+        merge_layout.setSpacing(10)
+        merge_layout.setContentsMargins(15, 20, 15, 15)
+
+        info_merge = QLabel(
+            "✅ داده‌های فعلی حفظ می‌شوند\n"
+            "✅ کاربران جدید اضافه می‌شوند\n"
+            "✅ کاربران موجود بروزرسانی می‌شوند\n"
+            "✅ موضوع، تاریخ و سال ثبت به صورت تجمیعی اضافه می‌شوند"
+        )
+        info_merge.setStyleSheet(
+            "color: #10B981; padding: 12px; font-size: 12px; "
+            "font-weight: 600; background-color: #064E3B; border-radius: 8px;"
+        )
+        info_merge.setWordWrap(True)
+        merge_layout.addWidget(info_merge)
+
+        # مرحله ۱: انتخاب فایل
+        step1_lbl = QLabel("📌 مرحله ۱: انتخاب فایل اکسل جدید")
+        step1_lbl.setStyleSheet(
+            "color: #60A5FA; font-size: 13px; font-weight: 700; "
+            "padding: 8px 0;"
+        )
+        merge_layout.addWidget(step1_lbl)
+
+        self.merge_file_path = None
+
+        self.select_merge_btn = QPushButton("📂  انتخاب فایل اکسل جدید")
+        self.select_merge_btn.setObjectName("primaryButton")
+        self.select_merge_btn.setMinimumHeight(44)
+        self.select_merge_btn.setStyleSheet("font-size: 13px;")
+        self.select_merge_btn.clicked.connect(self.select_merge_file)
+        merge_layout.addWidget(self.select_merge_btn)
+
+        # نمایش نام فایل انتخاب شده
+        self.merge_file_label = QLabel("هیچ فایلی انتخاب نشده است")
+        self.merge_file_label.setStyleSheet(
+            "color: #94A3B8; font-size: 12px; font-style: italic; "
+            "padding: 8px; background-color: #1E293B; "
+            "border-radius: 6px;"
+        )
+        self.merge_file_label.setWordWrap(True)
+        merge_layout.addWidget(self.merge_file_label)
+
+        # مرحله ۲: ادغام
+        step2_lbl = QLabel("📌 مرحله ۲: ادغام و بروزرسانی")
+        step2_lbl.setStyleSheet(
+            "color: #60A5FA; font-size: 13px; font-weight: 700; "
+            "padding: 8px 0;"
+        )
+        merge_layout.addWidget(step2_lbl)
+
+        self.merge_btn = QPushButton("🔄  ادغام و بروزرسانی دیتابیس")
+        self.merge_btn.setObjectName("successButton")
+        self.merge_btn.setMinimumHeight(48)
+        self.merge_btn.setStyleSheet("font-size: 14px;")
+        self.merge_btn.setEnabled(False)  # پیش‌فرض غیرفعال
+        self.merge_btn.clicked.connect(self.perform_merge)
+        merge_layout.addWidget(self.merge_btn)
+
+        reload_layout.addWidget(merge_group)
         reload_layout.addStretch()
-        tabs.addTab(reload_tab, "📂  بارگذاری مجدد")
+
+        tabs.addTab(reload_tab, "📂  مدیریت دیتاست")
 
         # تب بک‌آپ
         backup_tab = QWidget()
@@ -4712,6 +4786,315 @@ class CyberWatchApp(QMainWindow):
             text += "  " + str(i) + ". " + b + "\n"
         self.backup_list_widget.setPlainText(text)
 
+    # ═══════════════════════════════════════════════
+    # 🔄 توابع ادغام دیتاست
+    # ═══════════════════════════════════════════════
+    def select_merge_file(self):
+        """انتخاب فایل اکسل برای ادغام"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "انتخاب فایل اکسل جدید برای ادغام", "",
+            "Excel Files (*.xlsx *.xls)"
+        )
+
+        if not file_path:
+            return
+
+        self.merge_file_path = file_path
+        file_name = os.path.basename(file_path)
+
+        self.merge_file_label.setText(
+            "✅ فایل انتخاب شده:\n📄 " + file_name
+        )
+        self.merge_file_label.setStyleSheet(
+            "color: #10B981; font-size: 12px; font-weight: 700; "
+            "padding: 10px; background-color: #064E3B; "
+            "border-radius: 6px;"
+        )
+
+        # فعال کردن دکمه ادغام
+        self.merge_btn.setEnabled(True)
+        self.merge_btn.setText("🔄  ادغام و بروزرسانی دیتابیس (آماده)")
+
+    def perform_merge(self):
+        """اجرای عملیات ادغام"""
+        if not self.merge_file_path:
+            QMessageBox.warning(
+                self, "خطا", "ابتدا فایل اکسل را انتخاب کنید"
+            )
+            return
+
+        # تأیید نهایی
+        reply = QMessageBox.question(
+            self,
+            "تأیید ادغام",
+            "آیا مطمئن هستید که می‌خواهید این فایل با دیتابیس ادغام شود؟\n\n"
+            "📄 فایل: " + os.path.basename(self.merge_file_path) + "\n\n"
+            "✅ داده‌های فعلی حفظ می‌شوند\n"
+            "✅ داده‌های جدید اضافه می‌شوند\n"
+            "✅ داده‌های تکراری بروزرسانی می‌شوند",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if reply != QMessageBox.Yes:
+            return
+
+        # دیالوگ لودینگ
+        loading = QDialog(self)
+        loading.setWindowTitle("در حال ادغام...")
+        loading.setLayoutDirection(Qt.RightToLeft)
+        loading.setFixedSize(400, 170)
+        loading.setWindowFlags(
+            Qt.Dialog | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint
+        )
+        loading.setStyleSheet("""
+            QDialog {
+                background-color: #1E293B;
+                border: 2px solid #10B981;
+                border-radius: 15px;
+            }
+        """)
+
+        ll = QVBoxLayout(loading)
+        ll.setContentsMargins(30, 30, 30, 30)
+        ll.setSpacing(15)
+
+        lbl = QLabel("🔄  در حال ادغام دیتاست...")
+        lbl.setAlignment(Qt.AlignCenter)
+        lbl.setStyleSheet(
+            "font-size: 14px; font-weight: 700; color: #F1F5F9;"
+        )
+        ll.addWidget(lbl)
+
+        prog = QProgressBar()
+        prog.setMinimum(0)
+        prog.setMaximum(0)
+        prog.setFixedHeight(22)
+        prog.setStyleSheet("""
+            QProgressBar {
+                background-color: #334155;
+                border: none;
+                border-radius: 10px;
+            }
+            QProgressBar::chunk {
+                background-color: #10B981;
+                border-radius: 10px;
+            }
+        """)
+        ll.addWidget(prog)
+
+        loading.move(
+            self.x() + (self.width() - 400) // 2,
+            self.y() + (self.height() - 170) // 2
+        )
+
+        loading.show()
+        QApplication.processEvents()
+
+        try:
+            # گرفتن تعداد قبلی
+            old_stats = self.db.get_stats()
+            old_total = old_stats['total']
+
+            # اجرای ادغام
+            merge_stats = self.db.merge_excel(self.merge_file_path)
+
+            # گرفتن تعداد جدید
+            new_stats = self.db.get_stats()
+            new_total = new_stats['total']
+
+            loading.close()
+            loading.deleteLater()
+
+            # نمایش گزارش
+            self.show_merge_report(
+                merge_stats, old_total, new_total
+            )
+
+            # ریست کردن UI
+            self.merge_file_path = None
+            self.merge_file_label.setText("هیچ فایلی انتخاب نشده است")
+            self.merge_file_label.setStyleSheet(
+                "color: #94A3B8; font-size: 12px; font-style: italic; "
+                "padding: 8px; background-color: #1E293B; "
+                "border-radius: 6px;"
+            )
+            self.merge_btn.setEnabled(False)
+            self.merge_btn.setText("🔄  ادغام و بروزرسانی دیتابیس")
+
+            # بروزرسانی داشبورد
+            self.refresh_all_completers()
+            self.show_dashboard()
+
+        except Exception as e:
+            loading.close()
+            loading.deleteLater()
+            QMessageBox.critical(
+                self, "خطا",
+                "❌ خطا در ادغام:\n" + str(e)
+            )
+
+    def show_merge_report(self, stats, old_total, new_total):
+        """نمایش گزارش ادغام"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("گزارش ادغام")
+        dialog.setLayoutDirection(Qt.RightToLeft)
+        dialog.setMinimumSize(500, 480)
+        dialog.setStyleSheet("QDialog { background-color: #0F172A; }")
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(15)
+
+        # هدر موفقیت
+        success_frame = QFrame()
+        success_frame.setStyleSheet(
+            "background-color: #10B981; border-radius: 12px; padding: 15px;"
+        )
+        sf_layout = QVBoxLayout(success_frame)
+
+        success_icon = QLabel("✅")
+        success_icon.setStyleSheet(
+            "font-size: 48px; background-color: transparent;"
+        )
+        success_icon.setAlignment(Qt.AlignCenter)
+        sf_layout.addWidget(success_icon)
+
+        success_title = QLabel("ادغام با موفقیت انجام شد!")
+        success_title.setStyleSheet(
+            "font-size: 18px; font-weight: 900; color: white; "
+            "background-color: transparent;"
+        )
+        success_title.setAlignment(Qt.AlignCenter)
+        sf_layout.addWidget(success_title)
+
+        layout.addWidget(success_frame)
+
+        # کارت‌های آمار
+        stats_data = [
+            ("📄", "{:,}".format(stats['total_rows']),
+             "کل رکوردهای فایل اکسل", "#60A5FA"),
+            ("🆕", "{:,}".format(stats['new_users']),
+             "کاربران جدید اضافه شد", "#10B981"),
+            ("🔄", "{:,}".format(stats['updated_users']),
+             "کاربران بروزرسانی شد", "#F59E0B"),
+            ("⚠️", "{:,}".format(stats['skipped']),
+             "رکوردهای رد شده (بدون ایدی)", "#94A3B8"),
+        ]
+
+        for icon, value, label, color in stats_data:
+            card = QFrame()
+            card.setStyleSheet(
+                "background-color: #1E293B; border: 1px solid #334155; "
+                "border-radius: 10px; padding: 12px;"
+            )
+            cl = QHBoxLayout(card)
+            cl.setContentsMargins(15, 8, 15, 8)
+            cl.setSpacing(15)
+
+            icon_lbl = QLabel(icon)
+            icon_lbl.setStyleSheet(
+                "font-size: 32px; background-color: transparent;"
+            )
+            cl.addWidget(icon_lbl)
+
+            info_layout = QVBoxLayout()
+            info_layout.setSpacing(2)
+
+            label_lbl = QLabel(label)
+            label_lbl.setStyleSheet(
+                "color: #94A3B8; font-size: 12px; font-weight: 600;"
+            )
+            info_layout.addWidget(label_lbl)
+
+            value_lbl = QLabel(value)
+            value_lbl.setStyleSheet(
+                "font-size: 22px; font-weight: 900; color: " + color + ";"
+            )
+            info_layout.addWidget(value_lbl)
+
+            cl.addLayout(info_layout, 1)
+            layout.addWidget(card)
+
+        # جداکننده
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet("background-color: #334155;")
+        sep.setMaximumHeight(2)
+        layout.addWidget(sep)
+
+        # آمار کلی
+        total_frame = QFrame()
+        total_frame.setStyleSheet(
+            "background-color: #1E3A8A; border-radius: 10px; padding: 15px;"
+        )
+        tl = QVBoxLayout(total_frame)
+        tl.setSpacing(8)
+
+        row1 = QHBoxLayout()
+        row1_lbl = QLabel("📊 قبل از ادغام:")
+        row1_lbl.setStyleSheet(
+            "color: #93C5FD; font-size: 13px; font-weight: 700; "
+            "background-color: transparent;"
+        )
+        row1.addWidget(row1_lbl)
+
+        row1_val = QLabel("{:,}".format(old_total) + " رکورد")
+        row1_val.setStyleSheet(
+            "color: white; font-size: 15px; font-weight: 900; "
+            "background-color: transparent;"
+        )
+        row1_val.setAlignment(Qt.AlignLeft)
+        row1.addWidget(row1_val, 1)
+        tl.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        row2_lbl = QLabel("📈 بعد از ادغام:")
+        row2_lbl.setStyleSheet(
+            "color: #93C5FD; font-size: 13px; font-weight: 700; "
+            "background-color: transparent;"
+        )
+        row2.addWidget(row2_lbl)
+
+        row2_val = QLabel("{:,}".format(new_total) + " رکورد")
+        row2_val.setStyleSheet(
+            "color: #10B981; font-size: 15px; font-weight: 900; "
+            "background-color: transparent;"
+        )
+        row2_val.setAlignment(Qt.AlignLeft)
+        row2.addWidget(row2_val, 1)
+        tl.addLayout(row2)
+
+        # افزایش
+        increase = new_total - old_total
+        row3 = QHBoxLayout()
+        row3_lbl = QLabel("✨ افزایش:")
+        row3_lbl.setStyleSheet(
+            "color: #93C5FD; font-size: 13px; font-weight: 700; "
+            "background-color: transparent;"
+        )
+        row3.addWidget(row3_lbl)
+
+        row3_val = QLabel("+{:,}".format(increase) + " رکورد")
+        row3_val.setStyleSheet(
+            "color: #FCD34D; font-size: 15px; font-weight: 900; "
+            "background-color: transparent;"
+        )
+        row3_val.setAlignment(Qt.AlignLeft)
+        row3.addWidget(row3_val, 1)
+        tl.addLayout(row3)
+
+        layout.addWidget(total_frame)
+
+        # دکمه تأیید
+        ok_btn = QPushButton("✅ تأیید")
+        ok_btn.setObjectName("successButton")
+        ok_btn.setMinimumHeight(46)
+        ok_btn.setStyleSheet("font-size: 15px;")
+        ok_btn.clicked.connect(dialog.accept)
+        layout.addWidget(ok_btn)
+
+        dialog.exec_()
+    
     def reload_excel_from_settings(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "انتخاب فایل اکسل", "",
