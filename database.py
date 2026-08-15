@@ -355,17 +355,23 @@ class Database:
         return ''
 
     # ═══════════════════════════════════════════════
-    # 🔄 ادغام دیتاست جدید (Merge)
+    # 🔄 ادغام دیتاست جدید (Merge) - v11.2
+    # با تشخیص چندگانه: کد ملی → ایدی اینستاگرام
     # ═══════════════════════════════════════════════
     def merge_excel(self, file_path):
         """
         ادغام فایل اکسل جدید با دیتابیس موجود
-        بدون پاک کردن داده‌های قبلی
         
-        منطق:
-        - اگر ایدی موجود بود → بروزرسانی
-        - اگر ایدی جدید بود → اضافه
-        - فیلدهای تجمیعی: موضوع، تاریخ ثبت، سال ثبت
+        منطق تشخیص کاربر تکراری (به ترتیب اولویت):
+        1. کد ملی (اگه موجود باشه)
+        2. ایدی اینستاگرام (اگه موجود باشه)
+        
+        منطق SKIP:
+        - فقط ردیف‌هایی که هم کد ملی و هم ایدی خالی دارن
+        
+        منطق ادغام:
+        - فیلدهای معمولی: اگه جدید پر بود جایگزین، اگه خالی بود قدیمی حفظ
+        - فیلدهای تجمیعی (موضوع، تاریخ، سال): با | اضافه میشن
         """
         # بک‌آپ قبل از ادغام
         if os.path.exists(self.db_path):
@@ -426,6 +432,7 @@ class Database:
         # آمار عملیات
         stats = {
             'total_rows': len(df),
+            'valid_rows': 0,
             'new_users': 0,
             'updated_users': 0,
             'skipped': 0,
@@ -462,21 +469,41 @@ class Database:
                     else:
                         new_data[db_col] = value
 
-            # اگر ایدی نداشت، رد کن
-            if not new_data['instagram_id']:
+            # ═══ اعتبارسنجی: باید حداقل یکی از دو شناسه باشه ═══
+            instagram_id = new_data['instagram_id'].strip()
+            national_id = new_data['national_id'].strip()
+
+            if not instagram_id and not national_id:
+                # هر دو شناسه خالی است → رد کن
                 stats['skipped'] += 1
                 continue
 
-            # استخراج سال از تاریخ
+            # ردیف معتبر است
+            stats['valid_rows'] += 1
+
+            # استخراج سال از تاریخ اگه خالی بود
             if not new_data['reg_year'] and new_data['reg_date']:
                 new_data['reg_year'] = self._extract_year(new_data['reg_date'])
 
-            # چک کن آیا کاربر موجود هست
-            existing = conn.execute(
-                "SELECT * FROM users WHERE LOWER(instagram_id) = LOWER(?)",
-                (new_data['instagram_id'],)
-            ).fetchone()
+            # ═══ تشخیص کاربر تکراری با اولویت ═══
+            existing = None
 
+            # اولویت ۱: کد ملی
+            if national_id:
+                existing = conn.execute(
+                    "SELECT * FROM users WHERE national_id = ? AND national_id != ''",
+                    (national_id,)
+                ).fetchone()
+
+            # اولویت ۲: ایدی اینستاگرام (اگه با کد ملی پیدا نشد)
+            if not existing and instagram_id:
+                existing = conn.execute(
+                    "SELECT * FROM users WHERE LOWER(instagram_id) = LOWER(?) "
+                    "AND instagram_id != ''",
+                    (instagram_id,)
+                ).fetchone()
+
+            # ═══ تصمیم‌گیری: بروزرسانی یا اضافه کردن ═══
             if existing:
                 # 🔄 کاربر موجود → بروزرسانی
                 existing_dict = dict(existing)
@@ -484,12 +511,14 @@ class Database:
 
                 conn.execute("""
                     UPDATE users SET
-                        first_name=?, last_name=?, father_name=?,
-                        phone=?, national_id=?, subject=?,
-                        tarnama_code=?, reg_date=?, address=?,
-                        reg_year=?, followers=?, family_status=?
+                        instagram_id=?, first_name=?, last_name=?, 
+                        father_name=?, phone=?, national_id=?, 
+                        subject=?, tarnama_code=?, reg_date=?, 
+                        address=?, reg_year=?, followers=?, 
+                        family_status=?
                     WHERE id=?
                 """, (
+                    merged['instagram_id'],
                     merged['first_name'],
                     merged['last_name'],
                     merged['father_name'],
@@ -534,21 +563,36 @@ class Database:
         conn.close()
 
         return stats
-
     def _merge_user(self, existing, new_data):
         """
         ادغام هوشمند اطلاعات کاربر
-        - فیلدهای معمولی: اگه جدید پر بود → جایگزین کن
-                        اگه جدید خالی بود → قدیم حفظ کن
-        - فیلدهای تجمیعی: با | ادغام کن
+        
+        منطق:
+        - فیلدهای معمولی (نام، شماره، ...): 
+          اگه جدید پر بود → جایگزین
+          اگه جدید خالی بود → قدیمی حفظ
+        
+        - فیلدهای تجمیعی (موضوع، تاریخ، سال):
+          با | اضافه میشن اگه جدید متفاوت باشه
+        
+        - ایدی اینستاگرام و کد ملی:
+          اگه جدید داشتیم، جایگزین میکنیم (چون ممکنه از قبل خالی بوده)
         """
         merged = existing.copy()
 
-        # فیلدهای بروزرسانی شونده (Update)
+        # ═══ فیلدهای بروزرسانی شونده (Update) ═══
+        # اگه جدید مقدار داشت، جایگزین کن
+        # اگه جدید خالی بود، قدیمی حفظ میشه
         update_fields = [
-            'first_name', 'last_name', 'father_name',
-            'phone', 'national_id', 'tarnama_code',
-            'address', 'family_status'
+            'instagram_id',   # ← جدید: اگه قبلاً نبود، حالا بذار
+            'first_name',
+            'last_name',
+            'father_name',
+            'phone',
+            'national_id',    # ← جدید: اگه قبلاً نبود، حالا بذار
+            'tarnama_code',
+            'address',
+            'family_status'
         ]
 
         for field in update_fields:
@@ -557,12 +601,12 @@ class Database:
                 merged[field] = new_val
             # در غیر این صورت، مقدار قدیمی حفظ میشه
 
-        # فالوور: اگه عدد جدید بزرگتر بود، جایگزین کن
+        # ═══ فالوور: اگه عدد جدید بزرگتر بود، جایگزین کن ═══
         new_followers = int(new_data.get('followers', 0) or 0)
         if new_followers > 0:
             merged['followers'] = new_followers
 
-        # فیلدهای تجمیعی (Append with |)
+        # ═══ فیلدهای تجمیعی (Append with |) ═══
         append_fields = ['subject', 'reg_date', 'reg_year']
 
         for field in append_fields:
