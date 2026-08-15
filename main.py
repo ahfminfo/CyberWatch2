@@ -1,31 +1,36 @@
 """
 سامانه کاربران تحت نظارت در فضای مجازی
-نسخه 9.0 - نسخه حرفه‌ای با تحلیل هوشمند
-با پشتیبانی از تعداد دنبال‌کننده و بک‌آپ خودکار
+نسخه 10.0 - نسخه Enterprise با تشخیص تکراری و تکمیل هوشمند
 """
 import sys
 import os
 import time
+import re
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QLineEdit, QComboBox, QTextEdit, QTableWidget,
     QTableWidgetItem, QTabWidget, QMessageBox, QFileDialog,
     QHeaderView, QFrame, QStackedWidget, QScrollArea,
-    QGridLayout, QProgressBar, QDialog, QSpinBox
+    QGridLayout, QProgressBar, QDialog, QCheckBox, QRadioButton,
+    QButtonGroup, QCompleter, QGroupBox, QCalendarWidget
 )
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIntValidator
+from PyQt5.QtCore import Qt, QStringListModel, QDate, pyqtSignal
+from PyQt5.QtGui import (
+    QIntValidator, QRegExpValidator, QColor, QFont
+)
+from PyQt5.QtCore import QRegExp
 
 from database import Database
 
 
 # ═══════════════════════════════════════════════════════
-# تنظیمات اصلی برنامه
+# تنظیمات اصلی
 # ═══════════════════════════════════════════════════════
 APP_NAME = "سامانه کاربران تحت نظارت در فضای مجازی"
 APP_SHORT_NAME = "سامانه نظارت"
-APP_VERSION = "9.0"
+APP_VERSION = "10.0"
 
+# سال‌های شمسی
 YEARS_LIST = [""] + [str(y) for y in range(1399, 1416)]
 
 DEFAULT_SUBJECTS = [
@@ -59,12 +64,35 @@ SUBJECT_COLORS = {
     "بلاگر": "#EAB308",
 }
 
+# وضعیت‌های خانواده و اجتماعی
+FAMILY_STATUS_FLAGS = [
+    "فرزند طلاق",
+    "بدسرپرست",
+    "طلاق",
+    "فوت همسر",
+]
+
+ECONOMIC_STATUS_OPTIONS = [
+    "وضعیت اقتصادی ضعیف",
+    "وضعیت اقتصادی متوسط",
+    "وضعیت اقتصادی مناسب",
+]
+
+FAMILY_STATUS_COLORS = {
+    "فرزند طلاق": "#EC4899",
+    "بدسرپرست": "#EF4444",
+    "طلاق": "#F97316",
+    "فوت همسر": "#8B5CF6",
+    "وضعیت اقتصادی ضعیف": "#DC2626",
+    "وضعیت اقتصادی متوسط": "#F59E0B",
+    "وضعیت اقتصادی مناسب": "#10B981",
+}
+
 
 # ═══════════════════════════════════════════════════════
-# توابع کمکی برای فالوور
+# توابع کمکی فالوور
 # ═══════════════════════════════════════════════════════
 def format_followers(n):
-    """تبدیل عدد فالوور به فرمت خوانا"""
     if not n or n == 0:
         return "-"
     try:
@@ -80,7 +108,6 @@ def format_followers(n):
 
 
 def get_follower_category(n):
-    """دسته‌بندی فالوور با رنگ"""
     try:
         n = int(n) if n else 0
     except Exception:
@@ -101,7 +128,517 @@ def get_follower_category(n):
 
 
 # ═══════════════════════════════════════════════════════
-# استایل کامل (اصلاح شده - بدون تورفتگی)
+# 📅 تبدیل تاریخ شمسی و میلادی (بدون کتابخانه اضافی)
+# ═══════════════════════════════════════════════════════
+class PersianDate:
+    """کلاس تبدیل و مدیریت تاریخ شمسی"""
+
+    PERSIAN_MONTHS = [
+        "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+        "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
+    ]
+
+    PERSIAN_DAYS = ["ش", "ی", "د", "س", "چ", "پ", "ج"]
+
+    @staticmethod
+    def gregorian_to_jalali(gy, gm, gd):
+        """تبدیل میلادی به شمسی"""
+        g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
+        if gy > 1600:
+            jy = 979
+            gy -= 1600
+        else:
+            jy = 0
+            gy -= 621
+
+        gy2 = gy + 1 if gm > 2 else gy
+        days = (365 * gy) + ((gy2 + 3) // 4) - ((gy2 + 99) // 100) + \
+               ((gy2 + 399) // 400) - 80 + gd + g_d_m[gm - 1]
+
+        jy += 33 * (days // 12053)
+        days %= 12053
+        jy += 4 * (days // 1461)
+        days %= 1461
+
+        if days > 365:
+            jy += (days - 1) // 365
+            days = (days - 1) % 365
+
+        if days < 186:
+            jm = 1 + (days // 31)
+            jd = 1 + (days % 31)
+        else:
+            jm = 7 + ((days - 186) // 30)
+            jd = 1 + ((days - 186) % 30)
+
+        return jy, jm, jd
+
+    @staticmethod
+    def jalali_to_gregorian(jy, jm, jd):
+        """تبدیل شمسی به میلادی"""
+        if jy > 979:
+            gy = 1600
+            jy -= 979
+        else:
+            gy = 621
+
+        days = (365 * jy) + ((jy // 33) * 8) + (((jy % 33) + 3) // 4) + \
+               78 + jd
+
+        if jm < 7:
+            days += (jm - 1) * 31
+        else:
+            days += ((jm - 7) * 30) + 186
+
+        gy += 400 * (days // 146097)
+        days %= 146097
+
+        if days > 36524:
+            gy += 100 * (--days // 36524) if days > 0 else 0
+            days %= 36524
+            if days >= 365:
+                days += 1
+
+        gy += 4 * (days // 1461)
+        days %= 1461
+
+        if days > 365:
+            gy += (days - 1) // 365
+            days = (days - 1) % 365
+
+        gd = days + 1
+        sal_a = [0, 31, (29 if (gy % 4 == 0 and gy % 100 != 0) or
+                        (gy % 400 == 0) else 28),
+                 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+        gm = 0
+        while gm < 13 and gd > sal_a[gm]:
+            gd -= sal_a[gm]
+            gm += 1
+
+        return gy, gm, gd
+
+    @staticmethod
+    def today_jalali():
+        """تاریخ شمسی امروز"""
+        from datetime import date
+        today = date.today()
+        return PersianDate.gregorian_to_jalali(
+            today.year, today.month, today.day
+        )
+
+    @staticmethod
+    def format_jalali(jy, jm, jd):
+        """فرمت خروجی: 1403/05/15"""
+        return "{:04d}/{:02d}/{:02d}".format(jy, jm, jd)
+
+    @staticmethod
+    def parse_jalali(date_str):
+        """تجزیه رشته 1403/05/15 به (سال، ماه، روز)"""
+        try:
+            parts = date_str.strip().split('/')
+            if len(parts) == 3:
+                return int(parts[0]), int(parts[1]), int(parts[2])
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def is_valid(jy, jm, jd):
+        """چک اعتبار تاریخ شمسی"""
+        if not (1300 <= jy <= 1500):
+            return False
+        if not (1 <= jm <= 12):
+            return False
+
+        if jm <= 6:
+            max_day = 31
+        elif jm <= 11:
+            max_day = 30
+        else:
+            # اسفند - بررسی سال کبیسه
+            is_leap = ((jy % 33) % 4 == 1)
+            max_day = 30 if is_leap else 29
+
+        return 1 <= jd <= max_day
+
+
+# ═══════════════════════════════════════════════════════
+# 📅 Widget تقویم شمسی
+# ═══════════════════════════════════════════════════════
+class PersianCalendarDialog(QDialog):
+    """دیالوگ انتخاب تاریخ شمسی"""
+
+    date_selected = pyqtSignal(str)
+
+    def __init__(self, parent=None, initial_date=None):
+        super().__init__(parent)
+        self.setWindowTitle("انتخاب تاریخ")
+        self.setLayoutDirection(Qt.RightToLeft)
+        self.setFixedSize(420, 480)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1E293B;
+            }
+        """)
+
+        if initial_date:
+            parsed = PersianDate.parse_jalali(initial_date)
+            if parsed:
+                self.current_year, self.current_month, self.current_day = parsed
+            else:
+                self.current_year, self.current_month, self.current_day = \
+                    PersianDate.today_jalali()
+        else:
+            self.current_year, self.current_month, self.current_day = \
+                PersianDate.today_jalali()
+
+        self.selected_day = self.current_day
+        self.setup_ui()
+        self.update_calendar()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(12)
+
+        # هدر با تنظیم سال و ماه
+        header = QHBoxLayout()
+        header.setSpacing(8)
+
+        prev_year = QPushButton("<<")
+        prev_year.setMaximumWidth(40)
+        prev_year.setMinimumHeight(35)
+        prev_year.clicked.connect(self.prev_year)
+        header.addWidget(prev_year)
+
+        prev_month = QPushButton("<")
+        prev_month.setMaximumWidth(40)
+        prev_month.setMinimumHeight(35)
+        prev_month.clicked.connect(self.prev_month)
+        header.addWidget(prev_month)
+
+        self.header_label = QLabel("")
+        self.header_label.setAlignment(Qt.AlignCenter)
+        self.header_label.setStyleSheet("""
+            font-size: 15px;
+            font-weight: 700;
+            color: #60A5FA;
+            padding: 8px;
+            background-color: #0F172A;
+            border-radius: 6px;
+        """)
+        header.addWidget(self.header_label, 1)
+
+        next_month = QPushButton(">")
+        next_month.setMaximumWidth(40)
+        next_month.setMinimumHeight(35)
+        next_month.clicked.connect(self.next_month)
+        header.addWidget(next_month)
+
+        next_year = QPushButton(">>")
+        next_year.setMaximumWidth(40)
+        next_year.setMinimumHeight(35)
+        next_year.clicked.connect(self.next_year)
+        header.addWidget(next_year)
+
+        layout.addLayout(header)
+
+        # هدر روزهای هفته
+        days_header = QHBoxLayout()
+        days_header.setSpacing(3)
+        for day_name in ["ش", "ی", "د", "س", "چ", "پ", "ج"]:
+            lbl = QLabel(day_name)
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setStyleSheet("""
+                font-weight: 700;
+                color: #94A3B8;
+                padding: 5px;
+                background-color: #334155;
+                border-radius: 4px;
+                font-size: 12px;
+            """)
+            lbl.setMinimumHeight(30)
+            days_header.addWidget(lbl)
+        layout.addLayout(days_header)
+
+        # گرید روزها
+        self.days_grid = QGridLayout()
+        self.days_grid.setSpacing(3)
+        layout.addLayout(self.days_grid)
+
+        # دکمه‌های پایین
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(8)
+
+        today_btn = QPushButton("📅 امروز")
+        today_btn.setMinimumHeight(38)
+        today_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #10B981;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: 700;
+            }
+            QPushButton:hover { background-color: #059669; }
+        """)
+        today_btn.clicked.connect(self.go_today)
+        btn_layout.addWidget(today_btn)
+
+        ok_btn = QPushButton("✅ تأیید")
+        ok_btn.setMinimumHeight(38)
+        ok_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2563EB;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: 700;
+            }
+            QPushButton:hover { background-color: #1D4ED8; }
+        """)
+        ok_btn.clicked.connect(self.accept_date)
+        btn_layout.addWidget(ok_btn)
+
+        cancel_btn = QPushButton("❌ لغو")
+        cancel_btn.setMinimumHeight(38)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #475569;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: 700;
+            }
+            QPushButton:hover { background-color: #334155; }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        layout.addLayout(btn_layout)
+
+    def update_calendar(self):
+        # پاک کردن قبلی
+        while self.days_grid.count():
+            item = self.days_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        # هدر
+        self.header_label.setText(
+            PersianDate.PERSIAN_MONTHS[self.current_month - 1] +
+            " " + str(self.current_year)
+        )
+
+        # پیدا کردن روز شروع (شنبه = 0)
+        gy, gm, gd = PersianDate.jalali_to_gregorian(
+            self.current_year, self.current_month, 1
+        )
+        from datetime import date
+        first_day = date(gy, gm, gd)
+        # شنبه = 5 در weekday پایتون (دوشنبه = 0)
+        # میخوایم شنبه = 0 باشه
+        start_col = (first_day.weekday() + 2) % 7
+
+        # تعداد روزهای ماه
+        if self.current_month <= 6:
+            days_in_month = 31
+        elif self.current_month <= 11:
+            days_in_month = 30
+        else:
+            is_leap = ((self.current_year % 33) % 4 == 1)
+            days_in_month = 30 if is_leap else 29
+
+        # امروز
+        today_y, today_m, today_d = PersianDate.today_jalali()
+
+        # قرار دادن روزها
+        row = 0
+        col = start_col
+
+        # سلول‌های خالی ابتدا
+        for i in range(start_col):
+            empty = QLabel("")
+            empty.setMinimumHeight(38)
+            self.days_grid.addWidget(empty, 0, i)
+
+        for day in range(1, days_in_month + 1):
+            day_btn = QPushButton(str(day))
+            day_btn.setMinimumHeight(38)
+            day_btn.setCursor(Qt.PointingHandCursor)
+
+            # استایل پیش‌فرض
+            is_today = (
+                day == today_d and
+                self.current_month == today_m and
+                self.current_year == today_y
+            )
+            is_selected = (day == self.selected_day)
+
+            if is_selected:
+                style = """
+                    QPushButton {
+                        background-color: #2563EB;
+                        color: white;
+                        border: 2px solid #60A5FA;
+                        border-radius: 6px;
+                        font-weight: 900;
+                        font-size: 13px;
+                    }
+                """
+            elif is_today:
+                style = """
+                    QPushButton {
+                        background-color: #10B981;
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        font-weight: 700;
+                        font-size: 13px;
+                    }
+                    QPushButton:hover {
+                        background-color: #059669;
+                    }
+                """
+            else:
+                style = """
+                    QPushButton {
+                        background-color: #334155;
+                        color: #F1F5F9;
+                        border: none;
+                        border-radius: 6px;
+                        font-size: 13px;
+                    }
+                    QPushButton:hover {
+                        background-color: #475569;
+                        color: #60A5FA;
+                    }
+                """
+
+            day_btn.setStyleSheet(style)
+            day_btn.clicked.connect(
+                lambda checked, d=day: self.select_day(d)
+            )
+
+            self.days_grid.addWidget(day_btn, row, col)
+
+            col += 1
+            if col > 6:
+                col = 0
+                row += 1
+
+    def select_day(self, day):
+        self.selected_day = day
+        self.update_calendar()
+
+    def prev_month(self):
+        self.current_month -= 1
+        if self.current_month < 1:
+            self.current_month = 12
+            self.current_year -= 1
+        self.selected_day = 1
+        self.update_calendar()
+
+    def next_month(self):
+        self.current_month += 1
+        if self.current_month > 12:
+            self.current_month = 1
+            self.current_year += 1
+        self.selected_day = 1
+        self.update_calendar()
+
+    def prev_year(self):
+        self.current_year -= 1
+        self.update_calendar()
+
+    def next_year(self):
+        self.current_year += 1
+        self.update_calendar()
+
+    def go_today(self):
+        y, m, d = PersianDate.today_jalali()
+        self.current_year = y
+        self.current_month = m
+        self.selected_day = d
+        self.update_calendar()
+
+    def accept_date(self):
+        date_str = PersianDate.format_jalali(
+            self.current_year,
+            self.current_month,
+            self.selected_day
+        )
+        self.date_selected.emit(date_str)
+        self.accept()
+
+
+# ═══════════════════════════════════════════════════════
+# 🎯 Validator های سفارشی
+# ═══════════════════════════════════════════════════════
+class PersianTextValidator(QRegExpValidator):
+    """فقط حروف فارسی و فاصله"""
+    def __init__(self, parent=None):
+        regex = QRegExp(r"^[\u0600-\u06FF\s]+$")
+        super().__init__(regex, parent)
+
+
+class InstagramIdValidator(QRegExpValidator):
+    """ایدی اینستاگرام: حروف انگلیسی، عدد، نقطه، آندرلاین"""
+    def __init__(self, parent=None):
+        regex = QRegExp(r"^[a-zA-Z0-9._@]+$")
+        super().__init__(regex, parent)
+
+
+class NumberOnlyValidator(QRegExpValidator):
+    """فقط عدد"""
+    def __init__(self, parent=None):
+        regex = QRegExp(r"^[0-9]+$")
+        super().__init__(regex, parent)
+
+
+class TarnamaCodeValidator(QRegExpValidator):
+    """کد تارنما: عدد، حرف، / و \\"""
+    def __init__(self, parent=None):
+        regex = QRegExp(r"^[a-zA-Z0-9/\\\-]+$")
+        super().__init__(regex, parent)
+
+
+class PhoneValidator(QRegExpValidator):
+    """شماره تماس: فقط عدد، حداکثر 11 رقم"""
+    def __init__(self, parent=None):
+        regex = QRegExp(r"^0[0-9]{0,10}$")
+        super().__init__(regex, parent)
+
+
+class NationalIdValidator(QRegExpValidator):
+    """کد ملی: فقط 10 رقم"""
+    def __init__(self, parent=None):
+        regex = QRegExp(r"^[0-9]{0,10}$")
+        super().__init__(regex, parent)
+
+
+class DateValidator(QRegExpValidator):
+    """تاریخ شمسی: 1403/05/15"""
+    def __init__(self, parent=None):
+        regex = QRegExp(r"^[0-9/]*$")
+        super().__init__(regex, parent)
+
+
+def validate_national_id(code):
+    """اعتبارسنجی کد ملی ایرانی"""
+    if not code or len(code) != 10 or not code.isdigit():
+        return False
+
+    check = int(code[9])
+    s = sum(int(code[i]) * (10 - i) for i in range(9)) % 11
+
+    if s < 2:
+        return check == s
+    else:
+        return check == (11 - s)
+    # ═══════════════════════════════════════════════════════
+# استایل کامل (اصلاح شده)
 # ═══════════════════════════════════════════════════════
 STYLE = """
 * {
@@ -122,7 +659,7 @@ QMainWindow, QWidget {
 
 #sidebarLogo {
     color: #60A5FA;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 900;
     padding: 20px 15px 5px 15px;
     background-color: transparent;
@@ -140,7 +677,7 @@ QPushButton#navButton {
     color: #E2E8F0;
     border: none;
     text-align: right;
-    padding: 14px 20px;
+    padding: 12px 18px;
     font-size: 14px;
     font-weight: 600;
     border-radius: 10px;
@@ -186,14 +723,14 @@ QPushButton#navButton:checked {
     background-color: #1E293B;
     border: 1px solid #334155;
     border-radius: 12px;
-    padding: 18px;
+    padding: 15px;
 }
 
 #statCard {
     background-color: #1E293B;
     border: 1px solid #334155;
     border-radius: 12px;
-    padding: 18px;
+    padding: 15px;
 }
 
 /* ═══ دکمه‌ها ═══ */
@@ -202,7 +739,7 @@ QPushButton {
     color: #F1F5F9;
     border: 1px solid #475569;
     border-radius: 8px;
-    padding: 10px 18px;
+    padding: 8px 16px;
     font-size: 13px;
     font-weight: 600;
     min-height: 20px;
@@ -263,6 +800,18 @@ QPushButton#warningButton:hover {
     background-color: #D97706;
 }
 
+QPushButton#calendarButton {
+    background-color: #8B5CF6;
+    color: white;
+    border: none;
+    font-weight: 700;
+    padding: 8px 12px;
+}
+
+QPushButton#calendarButton:hover {
+    background-color: #7C3AED;
+}
+
 /* ═══ ورودی‌ها ═══ */
 QLineEdit, QTextEdit {
     background-color: #0F172A;
@@ -280,9 +829,14 @@ QLineEdit:focus, QTextEdit:focus {
     background-color: #1E293B;
 }
 
-QLineEdit:disabled {
+QLineEdit:disabled, QTextEdit:disabled {
     background-color: #1E293B;
     color: #64748B;
+}
+
+QLineEdit[readOnly="true"] {
+    background-color: #1E293B;
+    color: #94A3B8;
 }
 
 /* ═══ کمبوباکس ═══ */
@@ -295,16 +849,11 @@ QComboBox {
     font-size: 13px;
     font-weight: 600;
     min-height: 22px;
-    selection-background-color: #2563EB;
 }
 
 QComboBox:hover {
     border-color: #60A5FA;
     background-color: #334155;
-}
-
-QComboBox:focus {
-    border-color: #93C5FD;
 }
 
 QComboBox::drop-down {
@@ -403,6 +952,20 @@ QLabel#requiredLabel {
     padding: 2px 0;
 }
 
+QLabel#hintLabel {
+    color: #10B981;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 5px;
+}
+
+QLabel#errorLabel {
+    color: #EF4444;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 5px;
+}
+
 /* ═══ تب‌ها ═══ */
 QTabWidget::pane {
     border: 1px solid #334155;
@@ -431,6 +994,81 @@ QTabBar::tab:selected {
 
 QTabBar::tab:hover:!selected {
     background-color: #475569;
+}
+
+/* ═══ چک باکس و رادیو ═══ */
+QCheckBox {
+    color: #F1F5F9;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 5px;
+    spacing: 8px;
+}
+
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #475569;
+    border-radius: 4px;
+    background-color: #0F172A;
+}
+
+QCheckBox::indicator:hover {
+    border-color: #60A5FA;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #2563EB;
+    border-color: #60A5FA;
+    image: none;
+}
+
+QCheckBox::indicator:checked:hover {
+    background-color: #1D4ED8;
+}
+
+QRadioButton {
+    color: #F1F5F9;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 5px;
+    spacing: 8px;
+}
+
+QRadioButton::indicator {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #475569;
+    border-radius: 10px;
+    background-color: #0F172A;
+}
+
+QRadioButton::indicator:hover {
+    border-color: #60A5FA;
+}
+
+QRadioButton::indicator:checked {
+    background-color: #2563EB;
+    border-color: #60A5FA;
+}
+
+/* ═══ GroupBox ═══ */
+QGroupBox {
+    color: #60A5FA;
+    font-weight: 700;
+    font-size: 13px;
+    border: 2px solid #334155;
+    border-radius: 10px;
+    margin-top: 15px;
+    padding: 15px 10px 10px 10px;
+    background-color: #0F172A;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top right;
+    padding: 0 10px;
+    background-color: #1E293B;
 }
 
 /* ═══ اسکرول‌بار ═══ */
@@ -496,36 +1134,11 @@ QMessageBox QPushButton {
     min-width: 90px;
     padding: 8px 15px;
 }
-
-/* ═══ SpinBox ═══ */
-QSpinBox {
-    background-color: #0F172A;
-    color: #F1F5F9;
-    border: 2px solid #334155;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 13px;
-    min-height: 20px;
-}
-
-QSpinBox:focus {
-    border-color: #60A5FA;
-}
-
-QSpinBox::up-button, QSpinBox::down-button {
-    background-color: #334155;
-    border: none;
-    width: 20px;
-}
-
-QSpinBox::up-button:hover, QSpinBox::down-button:hover {
-    background-color: #475569;
-}
 """
 
 
 # ═══════════════════════════════════════════════════════
-# صفحه Splash
+# Splash Screen
 # ═══════════════════════════════════════════════════════
 class SplashScreen(QWidget):
     def __init__(self):
@@ -640,10 +1253,9 @@ class SplashScreen(QWidget):
 
 
 # ═══════════════════════════════════════════════════════
-# دیالوگ Setup اولیه
+# Setup Dialog
 # ═══════════════════════════════════════════════════════
 def show_setup_dialog_standalone(app, db):
-    """دیالوگ نصب اولیه"""
     dialog = QDialog()
     dialog.setWindowTitle("راه‌اندازی اولیه")
     dialog.setLayoutDirection(Qt.RightToLeft)
@@ -797,6 +1409,236 @@ def show_setup_dialog_standalone(app, db):
     dialog.exec_()
 
     return result['done']
+
+
+# ═══════════════════════════════════════════════════════
+# ⚠️ دیالوگ هشدار تکراری (حرفه‌ای)
+# ═══════════════════════════════════════════════════════
+class DuplicateWarningDialog(QDialog):
+    """
+    دیالوگ نمایش رکوردهای تکراری قبل از ثبت
+    خروجی: True = ثبت جدید، False = انصراف
+    """
+    def __init__(self, parent, check_result):
+        super().__init__(parent)
+        self.setWindowTitle("⚠️ هشدار تکراری")
+        self.setLayoutDirection(Qt.RightToLeft)
+        self.setMinimumSize(700, 550)
+        self.setStyleSheet("QDialog { background-color: #0F172A; }")
+
+        self.result_action = False  # پیش‌فرض: انصراف
+        self.check_result = check_result
+
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+
+        # هدر
+        match_type = self.check_result['match_type']
+        confidence = self.check_result['confidence']
+
+        if confidence == 'exact':
+            header_color = "#DC2626"
+            icon = "🚨"
+            title_text = "هشدار جدی: رکورد تکراری!"
+        else:
+            header_color = "#F59E0B"
+            icon = "⚠️"
+            title_text = "توجه: رکورد مشابه یافت شد"
+
+        header = QFrame()
+        header.setStyleSheet(
+            "background-color: " + header_color + "; "
+            "border-radius: 12px; padding: 15px;"
+        )
+        h_layout = QVBoxLayout(header)
+        h_layout.setSpacing(5)
+
+        title = QLabel(icon + "  " + title_text)
+        title.setStyleSheet(
+            "color: white; font-size: 18px; font-weight: 900; "
+            "background-color: transparent;"
+        )
+        title.setAlignment(Qt.AlignCenter)
+        h_layout.addWidget(title)
+
+        subtitle = QLabel(self.check_result['message'])
+        subtitle.setStyleSheet(
+            "color: white; font-size: 13px; font-weight: 600; "
+            "background-color: transparent;"
+        )
+        subtitle.setAlignment(Qt.AlignCenter)
+        h_layout.addWidget(subtitle)
+
+        layout.addWidget(header)
+
+        # اطلاعیه
+        count = len(self.check_result['matches'])
+        info = QLabel(
+            "🔍  " + str(count) + " رکورد مشابه در سامانه ثبت شده است. "
+            "لطفاً بررسی کنید:"
+        )
+        info.setStyleSheet(
+            "color: #60A5FA; font-size: 13px; font-weight: 700; "
+            "padding: 8px; background-color: #1E293B; border-radius: 8px;"
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        # لیست رکوردهای مشابه
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; }")
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setSpacing(10)
+        content_layout.setContentsMargins(5, 5, 5, 5)
+
+        for i, match in enumerate(self.check_result['matches'], 1):
+            card = self.create_match_card(i, match)
+            content_layout.addWidget(card)
+
+        content_layout.addStretch()
+        scroll.setWidget(content)
+        layout.addWidget(scroll, 1)
+
+        # سوال نهایی
+        question = QLabel(
+            "❓  آیا مطمئن هستید که این شخص جدید است و در سامانه ثبت نشده؟"
+        )
+        question.setStyleSheet(
+            "color: #F1F5F9; font-size: 14px; font-weight: 700; "
+            "padding: 15px; background-color: #78350F; border-radius: 10px;"
+        )
+        question.setAlignment(Qt.AlignCenter)
+        question.setWordWrap(True)
+        layout.addWidget(question)
+
+        # دکمه‌ها
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        cancel_btn = QPushButton("❌  انصراف از ثبت")
+        cancel_btn.setObjectName("dangerButton")
+        cancel_btn.setMinimumHeight(48)
+        cancel_btn.setStyleSheet("font-size: 14px; min-width: 200px;")
+        cancel_btn.clicked.connect(self.cancel_registration)
+        btn_row.addWidget(cancel_btn)
+
+        register_btn = QPushButton("✅  بله، شخص جدید است. ثبت کن")
+        register_btn.setObjectName("successButton")
+        register_btn.setMinimumHeight(48)
+        register_btn.setStyleSheet("font-size: 14px; min-width: 250px;")
+        register_btn.clicked.connect(self.confirm_registration)
+        btn_row.addWidget(register_btn)
+
+        layout.addLayout(btn_row)
+
+    def create_match_card(self, index, match):
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background-color: #1E293B;
+                border: 2px solid #334155;
+                border-radius: 10px;
+                padding: 12px;
+            }
+        """)
+
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(6)
+
+        # ردیف اول: شماره و نام
+        header = QHBoxLayout()
+
+        num = QLabel("#" + str(index))
+        num.setStyleSheet(
+            "background-color: #2563EB; color: white; "
+            "padding: 4px 10px; border-radius: 12px; "
+            "font-weight: 900; font-size: 12px;"
+        )
+        num.setMaximumWidth(50)
+        header.addWidget(num)
+
+        name = QLabel(
+            "@" + match.get('instagram_id', '') + "  |  " +
+            match.get('first_name', '') + " " +
+            match.get('last_name', '')
+        )
+        name.setStyleSheet(
+            "color: #60A5FA; font-weight: 700; font-size: 14px;"
+        )
+        header.addWidget(name, 1)
+
+        # فالوور اگه داره
+        fl = match.get('followers', 0)
+        if fl and fl > 0:
+            _, c, _ = get_follower_category(fl)
+            fl_lbl = QLabel(format_followers(fl))
+            fl_lbl.setStyleSheet(
+                "background-color: " + c + "; color: white; "
+                "padding: 4px 10px; border-radius: 10px; "
+                "font-weight: 700; font-size: 11px;"
+            )
+            header.addWidget(fl_lbl)
+
+        layout.addLayout(header)
+
+        # ردیف اطلاعات
+        info_parts = []
+        if match.get('national_id'):
+            info_parts.append("کد ملی: " + match['national_id'])
+        if match.get('phone'):
+            info_parts.append("موبایل: " + match['phone'])
+        if match.get('father_name'):
+            info_parts.append("پدر: " + match['father_name'])
+
+        if info_parts:
+            info = QLabel("  |  ".join(info_parts))
+            info.setStyleSheet("color: #94A3B8; font-size: 12px;")
+            layout.addWidget(info)
+
+        # موضوع
+        if match.get('subject'):
+            subj = match['subject']
+            first_subj = subj.split('|')[0].strip()
+            subj_color = SUBJECT_COLORS.get(first_subj, "#60A5FA")
+
+            subj_lbl = QLabel("📂 " + subj)
+            subj_lbl.setStyleSheet(
+                "color: " + subj_color + "; font-weight: 700; "
+                "font-size: 12px; padding: 3px 0;"
+            )
+            layout.addWidget(subj_lbl)
+
+        # سال ثبت و تاریخ
+        date_parts = []
+        if match.get('reg_year'):
+            date_parts.append("سال: " + match['reg_year'])
+        if match.get('reg_date'):
+            date_parts.append("تاریخ: " + match['reg_date'])
+
+        if date_parts:
+            date_lbl = QLabel("  📅  " + "  |  ".join(date_parts))
+            date_lbl.setStyleSheet(
+                "color: #94A3B8; font-size: 11px;"
+            )
+            layout.addWidget(date_lbl)
+
+        return card
+
+    def cancel_registration(self):
+        self.result_action = False
+        self.reject()
+
+    def confirm_registration(self):
+        self.result_action = True
+        self.accept()
     # ═══════════════════════════════════════════════════════
 # کلاس اصلی برنامه
 # ═══════════════════════════════════════════════════════
@@ -805,6 +1647,7 @@ class CyberWatchApp(QMainWindow):
         super().__init__()
         self.db = db
         self.edit_id = None
+        self.completers = {}  # برای نگهداری Completer ها
 
         self.setWindowTitle(APP_NAME + " - نسخه " + APP_VERSION)
         self.setLayoutDirection(Qt.RightToLeft)
@@ -815,7 +1658,7 @@ class CyberWatchApp(QMainWindow):
         self.show_dashboard()
 
     def closeEvent(self, event):
-        """بک‌آپ خودکار هنگام بستن برنامه"""
+        """بک‌آپ خودکار هنگام بستن"""
         try:
             if self.db.is_ready():
                 self.db.create_backup()
@@ -830,7 +1673,7 @@ class CyberWatchApp(QMainWindow):
         return DEFAULT_SUBJECTS
 
     def get_clean_subject_stats(self):
-        """آمار موضوعات پاک (بدون ترکیب)"""
+        """آمار موضوعات - همه موضوعات از جمله بلاگر"""
         if not self.db.is_ready():
             return []
 
@@ -840,6 +1683,7 @@ class CyberWatchApp(QMainWindow):
         ).fetchall()
         conn.close()
 
+        # همه موضوعات (شامل بلاگر) از لیست پیش‌فرض
         subject_counts = {s: 0 for s in DEFAULT_SUBJECTS if s}
 
         for row in rows:
@@ -871,6 +1715,60 @@ class CyberWatchApp(QMainWindow):
                 if p and p not in subjects:
                     subjects.append(p)
         return subjects
+
+    def setup_completer(self, line_edit, field_name):
+        """اضافه کردن Auto-Complete به یک ورودی"""
+        suggestions = self.db.get_all_unique_values(field_name)
+
+        if not suggestions:
+            return
+
+        completer = QCompleter(suggestions)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchContains)
+        completer.setCompletionMode(QCompleter.PopupCompletion)
+
+        popup = completer.popup()
+        popup.setStyleSheet("""
+            QListView {
+                background-color: #1E293B;
+                color: #F1F5F9;
+                border: 2px solid #3B82F6;
+                border-radius: 6px;
+                padding: 5px;
+                font-size: 13px;
+                outline: 0;
+            }
+            QListView::item {
+                padding: 8px 12px;
+                border-radius: 4px;
+                min-height: 24px;
+            }
+            QListView::item:hover {
+                background-color: #334155;
+                color: #60A5FA;
+            }
+            QListView::item:selected {
+                background-color: #2563EB;
+                color: white;
+                font-weight: 700;
+            }
+        """)
+
+        line_edit.setCompleter(completer)
+        self.completers[field_name] = completer
+
+    def refresh_all_completers(self):
+        """بروزرسانی همه Completer ها بعد از تغییرات دیتابیس"""
+        # این تابع بعد از ثبت/ویرایش/حذف صدا زده میشه
+        if hasattr(self, 'form_first_name'):
+            self.setup_completer(self.form_first_name, 'first_name')
+        if hasattr(self, 'form_last_name'):
+            self.setup_completer(self.form_last_name, 'last_name')
+        if hasattr(self, 'form_father_name'):
+            self.setup_completer(self.form_father_name, 'father_name')
+        if hasattr(self, 'form_address'):
+            pass  # QTextEdit نمیشه completer داشت
 
     # ═══════════════════════════════════════════════
     # ساخت UI اصلی
@@ -945,7 +1843,7 @@ class CyberWatchApp(QMainWindow):
             btn.setObjectName("navButton")
             btn.setCheckable(True)
             btn.clicked.connect(callback)
-            btn.setMinimumHeight(48)
+            btn.setMinimumHeight(46)
             layout.addWidget(btn)
             self.nav_buttons.append(btn)
 
@@ -972,9 +1870,6 @@ class CyberWatchApp(QMainWindow):
         for i, btn in enumerate(self.nav_buttons):
             btn.setChecked(i == index)
 
-    # ═══════════════════════════════════════════════
-    # هدر صفحه
-    # ═══════════════════════════════════════════════
     def create_page_header(self, title, subtitle=""):
         header = QFrame()
         header.setObjectName("pageHeader")
@@ -996,7 +1891,7 @@ class CyberWatchApp(QMainWindow):
         return header
 
     # ═══════════════════════════════════════════════
-    # صفحه داشبورد
+    # صفحه داشبورد (اصلاح شده)
     # ═══════════════════════════════════════════════
     def create_dashboard_page(self):
         page = QScrollArea()
@@ -1025,6 +1920,10 @@ class CyberWatchApp(QMainWindow):
         self.years_card.setObjectName("card")
         layout.addWidget(self.years_card)
 
+        self.family_card = QFrame()
+        self.family_card.setObjectName("card")
+        layout.addWidget(self.family_card)
+
         layout.addStretch()
 
         page.setWidget(content)
@@ -1038,54 +1937,52 @@ class CyberWatchApp(QMainWindow):
             "کل رکوردها: {:,}".format(stats['total'])
         )
 
+        # پاک کردن قبلی
         while self.stats_grid.count():
             item = self.stats_grid.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
+        # فقط سال‌های موجود واقعی محاسبه بشه
         active_years = len(stats['years'])
-        ph_pct = int(
-            (stats['filled'].get('phone', 0) / max(stats['total'], 1)) * 100
-        )
-        ig_pct = int(
-            (stats['filled'].get('instagram_id', 0) /
-             max(stats['total'], 1)) * 100
-        )
-        fl_pct = int(
-            (stats['filled'].get('followers', 0) /
-             max(stats['total'], 1)) * 100
-        )
+        total = max(stats['total'], 1)
+
+        ph_pct = int((stats['filled'].get('phone', 0) / total) * 100)
+        ig_pct = int((stats['filled'].get('instagram_id', 0) / total) * 100)
+        fl_pct = int((stats['filled'].get('followers', 0) / total) * 100)
+        fs_pct = int((stats['filled'].get('family_status', 0) / total) * 100)
 
         cards = [
             ("📦", "{:,}".format(stats['total']),
              "کل رکوردها", "#60A5FA"),
-            ("📅", str(active_years), "سال فعال", "#10B981"),
+            ("📅", str(active_years), "سال ثبت", "#10B981"),
             ("📂", str(len(clean_subjects)), "موضوعات", "#F59E0B"),
             ("📱", "{}%".format(ph_pct), "شماره تماس", "#A855F7"),
             ("📸", "{}%".format(ig_pct), "ایدی اینستا", "#EF4444"),
             ("👥", "{}%".format(fl_pct), "دارای فالوور", "#EAB308"),
+            ("🏠", "{}%".format(fs_pct), "وضعیت خانواده", "#EC4899"),
         ]
 
         for i, (icon, value, label, color) in enumerate(cards):
             card = QFrame()
             card.setObjectName("statCard")
             card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(15, 12, 15, 12)
-            card_layout.setSpacing(6)
+            card_layout.setContentsMargins(12, 10, 12, 10)
+            card_layout.setSpacing(4)
 
             icon_lbl = QLabel(icon)
-            icon_lbl.setStyleSheet("font-size: 36px;")
+            icon_lbl.setStyleSheet("font-size: 30px;")
             icon_lbl.setAlignment(Qt.AlignCenter)
 
             value_lbl = QLabel(value)
             value_lbl.setStyleSheet(
-                "font-size: 26px; font-weight: 900; color: " + color + ";"
+                "font-size: 22px; font-weight: 900; color: " + color + ";"
             )
             value_lbl.setAlignment(Qt.AlignCenter)
 
             label_lbl = QLabel(label)
             label_lbl.setStyleSheet(
-                "color: #94A3B8; font-size: 13px; font-weight: 600;"
+                "color: #94A3B8; font-size: 12px; font-weight: 600;"
             )
             label_lbl.setAlignment(Qt.AlignCenter)
 
@@ -1097,6 +1994,7 @@ class CyberWatchApp(QMainWindow):
 
         self.update_subjects_card(clean_subjects)
         self.update_years_card(stats)
+        self.update_family_card()
 
     def update_subjects_card(self, subjects_data):
         old_layout = self.subjects_card.layout()
@@ -1168,6 +2066,7 @@ class CyberWatchApp(QMainWindow):
             old_layout.addWidget(row_widget)
 
     def update_years_card(self, stats):
+        """نمایش فقط سال‌های واقعی موجود (بدون تکرار)"""
         old_layout = self.years_card.layout()
         if old_layout:
             while old_layout.count():
@@ -1179,7 +2078,9 @@ class CyberWatchApp(QMainWindow):
             old_layout.setContentsMargins(15, 15, 15, 15)
             old_layout.setSpacing(10)
 
-        title = QLabel("📅 توزیع سال‌های ثبت")
+        title = QLabel(
+            "📅 توزیع سال‌های ثبت (فقط سال‌های موجود در دیتابیس)"
+        )
         title.setStyleSheet(
             "font-size: 16px; font-weight: 700; "
             "color: #60A5FA; padding: 5px;"
@@ -1199,7 +2100,8 @@ class CyberWatchApp(QMainWindow):
 
         year_colors = [
             "#3B82F6", "#10B981", "#F59E0B", "#EF4444",
-            "#A855F7", "#EC4899", "#14B8A6"
+            "#A855F7", "#EC4899", "#14B8A6", "#F97316",
+            "#8B5CF6", "#EAB308"
         ]
 
         for i, (year, cnt) in enumerate(stats['years']):
@@ -1242,8 +2144,100 @@ class CyberWatchApp(QMainWindow):
 
             old_layout.addWidget(row_widget)
 
+    def update_family_card(self):
+        """کارت آمار وضعیت اجتماعی-اقتصادی"""
+        old_layout = self.family_card.layout()
+        if old_layout:
+            while old_layout.count():
+                item = old_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+        else:
+            old_layout = QVBoxLayout(self.family_card)
+            old_layout.setContentsMargins(15, 15, 15, 15)
+            old_layout.setSpacing(10)
+
+        title = QLabel("🏠 وضعیت اجتماعی-اقتصادی کاربران")
+        title.setStyleSheet(
+            "font-size: 16px; font-weight: 700; "
+            "color: #60A5FA; padding: 5px;"
+        )
+        old_layout.addWidget(title)
+
+        # دریافت آمار از دیتابیس
+        conn = self.db._conn()
+        rows = conn.execute(
+            "SELECT family_status FROM users WHERE family_status != ''"
+        ).fetchall()
+        conn.close()
+
+        all_statuses = FAMILY_STATUS_FLAGS + ECONOMIC_STATUS_OPTIONS
+        status_counts = {s: 0 for s in all_statuses}
+
+        for row in rows:
+            fs = row['family_status']
+            parts = [s.strip() for s in fs.split('|')]
+            for p in parts:
+                if p in status_counts:
+                    status_counts[p] += 1
+
+        active_statuses = [(s, c) for s, c in status_counts.items() if c > 0]
+        active_statuses.sort(key=lambda x: x[1], reverse=True)
+
+        if not active_statuses:
+            no_data = QLabel(
+                "هنوز اطلاعات وضعیت اجتماعی ثبت نشده است"
+            )
+            no_data.setStyleSheet(
+                "color: #64748B; padding: 15px; font-size: 13px;"
+            )
+            no_data.setAlignment(Qt.AlignCenter)
+            old_layout.addWidget(no_data)
+            return
+
+        max_cnt = max((c for _, c in active_statuses), default=1)
+
+        for status, cnt in active_statuses:
+            row_widget = QWidget()
+            row = QHBoxLayout(row_widget)
+            row.setContentsMargins(8, 3, 8, 3)
+            row.setSpacing(10)
+
+            color = FAMILY_STATUS_COLORS.get(status, "#60A5FA")
+
+            name = QLabel("● " + status)
+            name.setStyleSheet(
+                "padding: 4px; font-size: 13px; "
+                "font-weight: 600; color: " + color + ";"
+            )
+            row.addWidget(name, 3)
+
+            bar = QProgressBar()
+            bar.setMaximum(max_cnt)
+            bar.setValue(cnt)
+            bar.setTextVisible(False)
+            bar.setStyleSheet(
+                "QProgressBar { background-color: #334155; "
+                "border: none; border-radius: 6px; height: 12px; } "
+                "QProgressBar::chunk { background-color: " + color +
+                "; border-radius: 6px; }"
+            )
+            bar.setFixedHeight(12)
+            row.addWidget(bar, 4)
+
+            count = QLabel(str(cnt))
+            count.setStyleSheet(
+                "color: " + color + "; font-weight: 900; "
+                "font-size: 15px; padding: 3px 10px;"
+            )
+            count.setMinimumWidth(60)
+            count.setAlignment(Qt.AlignCenter)
+            row.addWidget(count, 1)
+
+            old_layout.addWidget(row_widget)
+
     # ═══════════════════════════════════════════════
-    # جدول نتایج مشترک (با ستون فالوور)
+    # جدول نتایج مشترک
     # ═══════════════════════════════════════════════
     def create_results_table(self):
         table = QTableWidget()
@@ -1290,11 +2284,9 @@ class CyberWatchApp(QMainWindow):
             table.setItem(row_idx, 6,
                 QTableWidgetItem(rec.get('subject', '')))
 
-            # فالوور با فرمت زیبا
             followers = rec.get('followers', 0)
             follower_item = QTableWidgetItem(format_followers(followers))
-            cat, color, _ = get_follower_category(followers)
-            from PyQt5.QtGui import QColor
+            _, color, _ = get_follower_category(followers)
             follower_item.setForeground(QColor(color))
             table.setItem(row_idx, 7, follower_item)
 
@@ -1401,9 +2393,6 @@ class CyberWatchApp(QMainWindow):
             "✅ {} نتیجه یافت شد".format(len(results))
         )
 
-    # ═══════════════════════════════════════════════
-    # مشاهده کامل رکورد
-    # ═══════════════════════════════════════════════
     def view_record(self, table):
         rec_id = self.get_selected_id(table)
         if rec_id is None:
@@ -1415,7 +2404,7 @@ class CyberWatchApp(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("مشاهده کامل کاربر")
         dialog.setLayoutDirection(Qt.RightToLeft)
-        dialog.setMinimumSize(720, 650)
+        dialog.setMinimumSize(720, 700)
 
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -1431,7 +2420,7 @@ class CyberWatchApp(QMainWindow):
         )
         layout.addWidget(title)
 
-        # نمایش فالوور با دسته‌بندی
+        # فالوور
         followers = rec.get('followers', 0)
         if followers and followers > 0:
             cat, color, emoji = get_follower_category(followers)
@@ -1462,6 +2451,43 @@ class CyberWatchApp(QMainWindow):
 
             layout.addWidget(follower_frame)
 
+        # وضعیت خانواده
+        family_status = rec.get('family_status', '')
+        if family_status:
+            fs_frame = QFrame()
+            fs_frame.setStyleSheet(
+                "background-color: #1E293B; border-radius: 10px; padding: 12px;"
+            )
+            fs_layout = QVBoxLayout(fs_frame)
+            fs_layout.setSpacing(6)
+
+            fs_title = QLabel("🏠 وضعیت اجتماعی-اقتصادی:")
+            fs_title.setStyleSheet(
+                "color: #EC4899; font-weight: 700; font-size: 13px;"
+            )
+            fs_layout.addWidget(fs_title)
+
+            fs_badges = QHBoxLayout()
+            fs_badges.setSpacing(6)
+            for status in family_status.split('|'):
+                status = status.strip()
+                if status:
+                    c = FAMILY_STATUS_COLORS.get(status, "#60A5FA")
+                    badge = QLabel("● " + status)
+                    badge.setStyleSheet(
+                        "background-color: " + c + "; color: white; "
+                        "padding: 4px 10px; border-radius: 10px; "
+                        "font-weight: 700; font-size: 11px;"
+                    )
+                    fs_badges.addWidget(badge)
+            fs_badges.addStretch()
+
+            fs_widget = QWidget()
+            fs_widget.setLayout(fs_badges)
+            fs_layout.addWidget(fs_widget)
+
+            layout.addWidget(fs_frame)
+
         # موضوعات
         instagram_id = rec.get('instagram_id', '')
         if instagram_id:
@@ -1474,7 +2500,6 @@ class CyberWatchApp(QMainWindow):
                 )
                 sf_layout = QVBoxLayout(subjects_frame)
                 sf_layout.setSpacing(8)
-                sf_layout.setContentsMargins(10, 10, 10, 10)
 
                 lbl = QLabel("📂 همه موضوعات ثبت شده برای این کاربر:")
                 lbl.setStyleSheet(
@@ -1501,6 +2526,7 @@ class CyberWatchApp(QMainWindow):
 
                 layout.addWidget(subjects_frame)
 
+        # سایر اطلاعات
         fa_map = {
             'instagram_id': 'ایدی اینستاگرام',
             'first_name': 'نام',
@@ -1521,7 +2547,6 @@ class CyberWatchApp(QMainWindow):
         content = QWidget()
         content_layout = QVBoxLayout(content)
         content_layout.setSpacing(6)
-        content_layout.setContentsMargins(5, 5, 5, 5)
 
         for key, fa in fa_map.items():
             val = rec.get(key, '')
@@ -1590,7 +2615,8 @@ class CyberWatchApp(QMainWindow):
                 self.do_search()
             elif table == self.list_table:
                 self.load_list()
-        # ═══════════════════════════════════════════════
+
+    # ═══════════════════════════════════════════════
     # صفحه جستجوی پیشرفته
     # ═══════════════════════════════════════════════
     def create_advanced_page(self):
@@ -1639,7 +2665,6 @@ class CyberWatchApp(QMainWindow):
 
             form_layout.addWidget(wrapper, row, col)
 
-        # موضوع
         subj_wrapper = QWidget()
         subj_container = QVBoxLayout(subj_wrapper)
         subj_container.setContentsMargins(0, 0, 0, 0)
@@ -1653,7 +2678,6 @@ class CyberWatchApp(QMainWindow):
         subj_container.addWidget(self.adv_subject)
         form_layout.addWidget(subj_wrapper, 2, 0, 1, 2)
 
-        # سال
         year_wrapper = QWidget()
         year_container = QVBoxLayout(year_wrapper)
         year_container.setContentsMargins(0, 0, 0, 0)
@@ -1746,9 +2770,8 @@ class CyberWatchApp(QMainWindow):
         self.adv_year.setCurrentIndex(0)
         self.adv_table.setRowCount(0)
         self.adv_count.setText("")
-
-    # ═══════════════════════════════════════════════
-    # صفحه فرم ثبت (با فیلد فالوور)
+        # ═══════════════════════════════════════════════
+    # 🎯 صفحه فرم ثبت (نسخه Enterprise)
     # ═══════════════════════════════════════════════
     def create_form_page(self):
         page = QScrollArea()
@@ -1758,120 +2781,278 @@ class CyberWatchApp(QMainWindow):
         content = QWidget()
         layout = QVBoxLayout(content)
         layout.setContentsMargins(25, 25, 25, 25)
-        layout.setSpacing(18)
+        layout.setSpacing(15)
 
         self.form_header = self.create_page_header(
             "➕ ثبت کاربر جدید",
-            "اطلاعات کاربر جدید را با دقت وارد کنید"
+            "با اعتبارسنجی هوشمند و تشخیص خودکار تکراری"
         )
         layout.addWidget(self.form_header)
 
-        form_card = QFrame()
-        form_card.setObjectName("card")
-        form_layout = QGridLayout(form_card)
-        form_layout.setContentsMargins(18, 18, 18, 18)
-        form_layout.setSpacing(15)
+        # ═══ گروه ۱: اطلاعات هویتی ═══
+        identity_group = QGroupBox("🆔 اطلاعات هویتی")
+        identity_layout = QGridLayout(identity_group)
+        identity_layout.setSpacing(12)
+        identity_layout.setContentsMargins(15, 20, 15, 15)
 
-        # ردیف ۱: ایدی + نام
-        lbl = QLabel("⭐ ایدی اینستاگرام *")
-        lbl.setObjectName("requiredLabel")
-        form_layout.addWidget(lbl, 0, 0)
+        # ایدی اینستاگرام
+        lbl_ig = QLabel("⭐ ایدی اینستاگرام *")
+        lbl_ig.setObjectName("requiredLabel")
+        identity_layout.addWidget(lbl_ig, 0, 0)
         self.form_instagram = QLineEdit()
         self.form_instagram.setMinimumHeight(40)
-        form_layout.addWidget(self.form_instagram, 0, 1)
+        self.form_instagram.setPlaceholderText("مثال: user_name123")
+        self.form_instagram.setValidator(InstagramIdValidator())
+        identity_layout.addWidget(self.form_instagram, 0, 1)
 
-        lbl2 = QLabel("نام")
-        lbl2.setObjectName("formLabel")
-        form_layout.addWidget(lbl2, 0, 2)
+        self.ig_hint = QLabel("")
+        self.ig_hint.setObjectName("hintLabel")
+        identity_layout.addWidget(self.ig_hint, 0, 2)
+
+        # نام
+        lbl_fn = QLabel("نام")
+        lbl_fn.setObjectName("formLabel")
+        identity_layout.addWidget(lbl_fn, 1, 0)
         self.form_first_name = QLineEdit()
         self.form_first_name.setMinimumHeight(40)
-        form_layout.addWidget(self.form_first_name, 0, 3)
+        self.form_first_name.setPlaceholderText("فقط حروف فارسی")
+        self.form_first_name.setValidator(PersianTextValidator())
+        identity_layout.addWidget(self.form_first_name, 1, 1)
 
-        # ردیف ۲
-        lbl3 = QLabel("نام خانوادگی")
-        lbl3.setObjectName("formLabel")
-        form_layout.addWidget(lbl3, 1, 0)
+        self.fn_hint = QLabel("💡 پیشنهاد هوشمند فعال")
+        self.fn_hint.setObjectName("hintLabel")
+        identity_layout.addWidget(self.fn_hint, 1, 2)
+
+        # نام خانوادگی
+        lbl_ln = QLabel("نام خانوادگی")
+        lbl_ln.setObjectName("formLabel")
+        identity_layout.addWidget(lbl_ln, 2, 0)
         self.form_last_name = QLineEdit()
         self.form_last_name.setMinimumHeight(40)
-        form_layout.addWidget(self.form_last_name, 1, 1)
+        self.form_last_name.setPlaceholderText("فقط حروف فارسی")
+        self.form_last_name.setValidator(PersianTextValidator())
+        identity_layout.addWidget(self.form_last_name, 2, 1)
 
-        lbl4 = QLabel("نام پدر")
-        lbl4.setObjectName("formLabel")
-        form_layout.addWidget(lbl4, 1, 2)
+        self.ln_hint = QLabel("💡 پیشنهاد هوشمند فعال")
+        self.ln_hint.setObjectName("hintLabel")
+        identity_layout.addWidget(self.ln_hint, 2, 2)
+
+        # نام پدر
+        lbl_fa = QLabel("نام پدر")
+        lbl_fa.setObjectName("formLabel")
+        identity_layout.addWidget(lbl_fa, 3, 0)
         self.form_father_name = QLineEdit()
         self.form_father_name.setMinimumHeight(40)
-        form_layout.addWidget(self.form_father_name, 1, 3)
+        self.form_father_name.setPlaceholderText("فقط حروف فارسی")
+        self.form_father_name.setValidator(PersianTextValidator())
+        identity_layout.addWidget(self.form_father_name, 3, 1)
 
-        # ردیف ۳
-        lbl5 = QLabel("شماره تماس")
-        lbl5.setObjectName("formLabel")
-        form_layout.addWidget(lbl5, 2, 0)
-        self.form_phone = QLineEdit()
-        self.form_phone.setMinimumHeight(40)
-        form_layout.addWidget(self.form_phone, 2, 1)
+        self.fa_hint = QLabel("💡 پیشنهاد هوشمند فعال")
+        self.fa_hint.setObjectName("hintLabel")
+        identity_layout.addWidget(self.fa_hint, 3, 2)
 
-        lbl6 = QLabel("شماره ملی")
-        lbl6.setObjectName("formLabel")
-        form_layout.addWidget(lbl6, 2, 2)
+        # کد ملی
+        lbl_ni = QLabel("شماره ملی")
+        lbl_ni.setObjectName("formLabel")
+        identity_layout.addWidget(lbl_ni, 4, 0)
         self.form_national_id = QLineEdit()
         self.form_national_id.setMinimumHeight(40)
-        form_layout.addWidget(self.form_national_id, 2, 3)
+        self.form_national_id.setPlaceholderText("10 رقم - فقط عدد")
+        self.form_national_id.setMaxLength(10)
+        self.form_national_id.setValidator(NationalIdValidator())
+        identity_layout.addWidget(self.form_national_id, 4, 1)
 
-        # ردیف ۴: فالوور + سال
+        self.ni_hint = QLabel("")
+        self.ni_hint.setObjectName("hintLabel")
+        identity_layout.addWidget(self.ni_hint, 4, 2)
+
+        # تنظیم عرض ستون‌ها
+        identity_layout.setColumnStretch(0, 0)
+        identity_layout.setColumnStretch(1, 3)
+        identity_layout.setColumnStretch(2, 2)
+
+        layout.addWidget(identity_group)
+
+        # ═══ گروه ۲: اطلاعات تماس ═══
+        contact_group = QGroupBox("📞 اطلاعات تماس")
+        contact_layout = QGridLayout(contact_group)
+        contact_layout.setSpacing(12)
+        contact_layout.setContentsMargins(15, 20, 15, 15)
+
+        # شماره تماس
+        lbl_ph = QLabel("شماره تماس")
+        lbl_ph.setObjectName("formLabel")
+        contact_layout.addWidget(lbl_ph, 0, 0)
+        self.form_phone = QLineEdit()
+        self.form_phone.setMinimumHeight(40)
+        self.form_phone.setPlaceholderText("مثال: 09121234567")
+        self.form_phone.setMaxLength(11)
+        self.form_phone.setValidator(PhoneValidator())
+        contact_layout.addWidget(self.form_phone, 0, 1)
+
+        # نشانی
+        lbl_ad = QLabel("نشانی")
+        lbl_ad.setObjectName("formLabel")
+        contact_layout.addWidget(lbl_ad, 1, 0, Qt.AlignTop)
+        self.form_address = QTextEdit()
+        self.form_address.setMaximumHeight(70)
+        self.form_address.setPlaceholderText("نشانی محل سکونت...")
+        contact_layout.addWidget(self.form_address, 1, 1)
+
+        contact_layout.setColumnStretch(0, 0)
+        contact_layout.setColumnStretch(1, 5)
+
+        layout.addWidget(contact_group)
+
+        # ═══ گروه ۳: اطلاعات ثبت ═══
+        record_group = QGroupBox("📋 اطلاعات ثبت")
+        record_layout = QGridLayout(record_group)
+        record_layout.setSpacing(12)
+        record_layout.setContentsMargins(15, 20, 15, 15)
+
+        # موضوع
+        lbl_sb = QLabel("📂 موضوع ثبت *")
+        lbl_sb.setObjectName("requiredLabel")
+        record_layout.addWidget(lbl_sb, 0, 0)
+        self.form_subject = QComboBox()
+        self.form_subject.setMinimumHeight(40)
+        self.form_subject.addItems(self.get_subjects_list())
+        record_layout.addWidget(self.form_subject, 0, 1)
+
+        # فالوور
         lbl_fl = QLabel("👥 تعداد دنبال‌کننده")
         lbl_fl.setObjectName("formLabel")
-        form_layout.addWidget(lbl_fl, 3, 0)
+        record_layout.addWidget(lbl_fl, 0, 2)
         self.form_followers = QLineEdit()
         self.form_followers.setMinimumHeight(40)
         self.form_followers.setPlaceholderText("مثال: 15000")
         self.form_followers.setValidator(QIntValidator(0, 999999999))
-        form_layout.addWidget(self.form_followers, 3, 1)
+        record_layout.addWidget(self.form_followers, 0, 3)
 
-        lbl8 = QLabel("📅 سال ثبت")
-        lbl8.setObjectName("formLabel")
-        form_layout.addWidget(lbl8, 3, 2)
-        self.form_year = QComboBox()
-        self.form_year.setMinimumHeight(40)
-        self.form_year.addItems(YEARS_LIST)
-        form_layout.addWidget(self.form_year, 3, 3)
+        # تاریخ ثبت (با تقویم شمسی)
+        lbl_dt = QLabel("📅 تاریخ ثبت")
+        lbl_dt.setObjectName("formLabel")
+        record_layout.addWidget(lbl_dt, 1, 0)
 
-        # ردیف ۵: موضوع
-        lbl7 = QLabel("📂 موضوع ثبت *")
-        lbl7.setObjectName("requiredLabel")
-        form_layout.addWidget(lbl7, 4, 0)
-        self.form_subject = QComboBox()
-        self.form_subject.setMinimumHeight(40)
-        self.form_subject.addItems(self.get_subjects_list())
-        form_layout.addWidget(self.form_subject, 4, 1)
+        date_widget = QWidget()
+        date_layout = QHBoxLayout(date_widget)
+        date_layout.setContentsMargins(0, 0, 0, 0)
+        date_layout.setSpacing(5)
 
-        lbl9 = QLabel("کد تارنما")
-        lbl9.setObjectName("formLabel")
-        form_layout.addWidget(lbl9, 4, 2)
-        self.form_tarnama = QLineEdit()
-        self.form_tarnama.setMinimumHeight(40)
-        form_layout.addWidget(self.form_tarnama, 4, 3)
-
-        # ردیف ۶: تاریخ
-        lbl10 = QLabel("تاریخ ثبت")
-        lbl10.setObjectName("formLabel")
-        form_layout.addWidget(lbl10, 5, 0)
         self.form_reg_date = QLineEdit()
         self.form_reg_date.setMinimumHeight(40)
-        self.form_reg_date.setPlaceholderText("مثال: 1403/05/15")
-        form_layout.addWidget(self.form_reg_date, 5, 1)
+        self.form_reg_date.setPlaceholderText("1403/05/15")
+        self.form_reg_date.setValidator(DateValidator())
+        self.form_reg_date.setMaxLength(10)
+        date_layout.addWidget(self.form_reg_date, 1)
 
-        # ردیف ۷: نشانی
-        lbl11 = QLabel("نشانی")
-        lbl11.setObjectName("formLabel")
-        form_layout.addWidget(lbl11, 6, 0)
-        self.form_address = QTextEdit()
-        self.form_address.setMaximumHeight(90)
-        form_layout.addWidget(self.form_address, 6, 1, 1, 3)
+        calendar_btn = QPushButton("📆")
+        calendar_btn.setObjectName("calendarButton")
+        calendar_btn.setMinimumHeight(40)
+        calendar_btn.setMaximumWidth(50)
+        calendar_btn.setToolTip("انتخاب از تقویم")
+        calendar_btn.clicked.connect(self.open_calendar)
+        date_layout.addWidget(calendar_btn)
 
-        layout.addWidget(form_card)
+        record_layout.addWidget(date_widget, 1, 1)
 
+        # نمایش سال استخراج شده (فقط خواندنی)
+        lbl_yr = QLabel("📅 سال (خودکار)")
+        lbl_yr.setObjectName("formLabel")
+        record_layout.addWidget(lbl_yr, 1, 2)
+        self.form_year_display = QLineEdit()
+        self.form_year_display.setMinimumHeight(40)
+        self.form_year_display.setReadOnly(True)
+        self.form_year_display.setPlaceholderText("از تاریخ استخراج می‌شود")
+        record_layout.addWidget(self.form_year_display, 1, 3)
+
+        # کد تارنما
+        lbl_tc = QLabel("کد تارنما")
+        lbl_tc.setObjectName("formLabel")
+        record_layout.addWidget(lbl_tc, 2, 0)
+        self.form_tarnama = QLineEdit()
+        self.form_tarnama.setMinimumHeight(40)
+        self.form_tarnama.setPlaceholderText("مثال: 123/45\\67")
+        self.form_tarnama.setValidator(TarnamaCodeValidator())
+        record_layout.addWidget(self.form_tarnama, 2, 1, 1, 3)
+
+        layout.addWidget(record_group)
+
+        # ═══ گروه ۴: وضعیت اجتماعی-اقتصادی ═══
+        family_group = QGroupBox("🏠 وضعیت اجتماعی-اقتصادی")
+        family_layout = QVBoxLayout(family_group)
+        family_layout.setSpacing(10)
+        family_layout.setContentsMargins(15, 20, 15, 15)
+
+        # چک‌باکس‌های وضعیت خانواده
+        family_lbl = QLabel("وضعیت خانوادگی:")
+        family_lbl.setStyleSheet(
+            "color: #EC4899; font-weight: 700; font-size: 13px; padding: 5px 0;"
+        )
+        family_layout.addWidget(family_lbl)
+
+        self.family_checkboxes = {}
+        cb_grid = QGridLayout()
+        cb_grid.setSpacing(8)
+
+        for i, flag in enumerate(FAMILY_STATUS_FLAGS):
+            cb = QCheckBox(flag)
+            self.family_checkboxes[flag] = cb
+            cb_grid.addWidget(cb, i // 2, i % 2)
+
+        family_layout.addLayout(cb_grid)
+
+        # جداکننده
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet("background-color: #334155;")
+        sep.setMaximumHeight(2)
+        family_layout.addWidget(sep)
+
+        # رادیو باتن‌های وضعیت اقتصادی
+        econ_lbl = QLabel("وضعیت اقتصادی:")
+        econ_lbl.setStyleSheet(
+            "color: #F59E0B; font-weight: 700; font-size: 13px; padding: 5px 0;"
+        )
+        family_layout.addWidget(econ_lbl)
+
+        self.econ_button_group = QButtonGroup()
+        self.econ_radios = {}
+        radio_layout = QHBoxLayout()
+        radio_layout.setSpacing(15)
+
+        for opt in ECONOMIC_STATUS_OPTIONS:
+            radio = QRadioButton(opt)
+            self.econ_button_group.addButton(radio)
+            self.econ_radios[opt] = radio
+            radio_layout.addWidget(radio)
+
+        radio_layout.addStretch()
+        family_layout.addLayout(radio_layout)
+
+        layout.addWidget(family_group)
+
+        # ═══ نوار وضعیت (هشدار تکراری) ═══
+        self.status_frame = QFrame()
+        self.status_frame.setStyleSheet(
+            "background-color: transparent; padding: 0;"
+        )
+        self.status_frame.setMaximumHeight(0)
+        layout.addWidget(self.status_frame)
+
+        # ═══ دکمه‌های عملیات ═══
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
+
+        self.check_btn = QPushButton("🔍  بررسی تکراری")
+        self.check_btn.setMinimumHeight(48)
+        self.check_btn.setStyleSheet(
+            "font-size: 14px; min-width: 180px; "
+            "background-color: #8B5CF6; color: white; "
+            "border: none; font-weight: 700;"
+        )
+        self.check_btn.clicked.connect(self.check_duplicate_manually)
+        btn_row.addWidget(self.check_btn)
 
         self.save_btn = QPushButton("✅  ثبت کاربر")
         self.save_btn.setObjectName("successButton")
@@ -1890,9 +3071,215 @@ class CyberWatchApp(QMainWindow):
         layout.addLayout(btn_row)
         layout.addStretch()
 
+        # ═══ اتصال سیگنال‌ها ═══
+        self.form_reg_date.textChanged.connect(self.on_date_changed)
+        self.form_national_id.textChanged.connect(self.on_field_changed)
+        self.form_instagram.textChanged.connect(self.on_field_changed)
+        self.form_first_name.textChanged.connect(self.on_field_changed)
+        self.form_last_name.textChanged.connect(self.on_field_changed)
+
+        # اضافه کردن Completer به فرم
+        self.setup_form_completers()
+
         page.setWidget(content)
         return page
 
+    # ═══════════════════════════════════════════════
+    # تقویم شمسی
+    # ═══════════════════════════════════════════════
+    def open_calendar(self):
+        """باز کردن دیالوگ تقویم شمسی"""
+        current_date = self.form_reg_date.text().strip()
+        dialog = PersianCalendarDialog(
+            self,
+            initial_date=current_date if current_date else None
+        )
+        dialog.date_selected.connect(self.on_date_selected)
+        dialog.exec_()
+
+    def on_date_selected(self, date_str):
+        """وقتی از تقویم تاریخ انتخاب شد"""
+        self.form_reg_date.setText(date_str)
+
+    def on_date_changed(self, text):
+        """استخراج خودکار سال از تاریخ"""
+        match = re.match(r'^(\d{4})', text.strip())
+        if match:
+            year = match.group(1)
+            self.form_year_display.setText(year)
+        else:
+            self.form_year_display.clear()
+
+    # ═══════════════════════════════════════════════
+    # Auto-Complete
+    # ═══════════════════════════════════════════════
+    def setup_form_completers(self):
+        """اضافه کردن تکمیل هوشمند به فیلدها"""
+        self.setup_completer(self.form_first_name, 'first_name')
+        self.setup_completer(self.form_last_name, 'last_name')
+        self.setup_completer(self.form_father_name, 'father_name')
+
+    # ═══════════════════════════════════════════════
+    # تشخیص خودکار تغییرات (Live Check)
+    # ═══════════════════════════════════════════════
+    def on_field_changed(self):
+        """پاک کردن پیام‌های قبلی وقتی کاربر تغییر میده"""
+        self.clear_status_message()
+
+        # اعتبارسنجی کد ملی زنده
+        ni = self.form_national_id.text().strip()
+        if ni:
+            if len(ni) == 10:
+                if validate_national_id(ni):
+                    self.ni_hint.setText("✅ کد ملی معتبر")
+                    self.ni_hint.setStyleSheet(
+                        "color: #10B981; font-size: 11px; font-weight: 700;"
+                    )
+                else:
+                    self.ni_hint.setText("❌ کد ملی نامعتبر")
+                    self.ni_hint.setStyleSheet(
+                        "color: #EF4444; font-size: 11px; font-weight: 700;"
+                    )
+            elif len(ni) > 0:
+                self.ni_hint.setText(
+                    "⏳ " + str(10 - len(ni)) + " رقم دیگر..."
+                )
+                self.ni_hint.setStyleSheet(
+                    "color: #F59E0B; font-size: 11px; font-weight: 700;"
+                )
+        else:
+            self.ni_hint.setText("")
+
+    def clear_status_message(self):
+        """پاک کردن پیام هشدار"""
+        old_layout = self.status_frame.layout()
+        if old_layout:
+            while old_layout.count():
+                item = old_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+        self.status_frame.setMaximumHeight(0)
+        self.status_frame.setStyleSheet(
+            "background-color: transparent; padding: 0;"
+        )
+
+    def show_status_message(self, message, msg_type="info"):
+        """نمایش پیام در نوار وضعیت"""
+        self.clear_status_message()
+
+        colors = {
+            "info": ("#3B82F6", "#1E3A8A"),
+            "success": ("#10B981", "#064E3B"),
+            "warning": ("#F59E0B", "#78350F"),
+            "error": ("#EF4444", "#7F1D1D"),
+        }
+        border_color, bg_color = colors.get(msg_type, colors["info"])
+
+        self.status_frame.setMaximumHeight(60)
+        self.status_frame.setStyleSheet(
+            "background-color: " + bg_color + "; "
+            "border: 2px solid " + border_color + "; "
+            "border-radius: 8px; padding: 8px;"
+        )
+
+        layout = self.status_frame.layout()
+        if not layout:
+            layout = QHBoxLayout(self.status_frame)
+            layout.setContentsMargins(15, 8, 15, 8)
+
+        lbl = QLabel(message)
+        lbl.setStyleSheet(
+            "color: white; font-size: 13px; font-weight: 700; "
+            "background-color: transparent; border: none;"
+        )
+        lbl.setWordWrap(True)
+        layout.addWidget(lbl)
+
+    # ═══════════════════════════════════════════════
+    # چک تکراری دستی (دکمه بررسی)
+    # ═══════════════════════════════════════════════
+    def check_duplicate_manually(self):
+        """کاربر دکمه بررسی تکراری زده"""
+        national_id = self.form_national_id.text().strip()
+        instagram_id = self.form_instagram.text().strip()
+        first_name = self.form_first_name.text().strip()
+        last_name = self.form_last_name.text().strip()
+
+        if not (national_id or instagram_id or (first_name and last_name)):
+            self.show_status_message(
+                "⚠️ حداقل یکی از: کد ملی، ایدی اینستاگرام یا نام و "
+                "نام خانوادگی را وارد کنید",
+                "warning"
+            )
+            return
+
+        result = self.db.check_duplicate(
+            national_id=national_id,
+            instagram_id=instagram_id,
+            first_name=first_name,
+            last_name=last_name,
+            exclude_id=self.edit_id
+        )
+
+        if result['has_duplicate']:
+            count = len(result['matches'])
+            self.show_status_message(
+                "⚠️ " + str(count) + " رکورد مشابه یافت شد! "
+                "قبل از ثبت بررسی کنید.",
+                "warning"
+            )
+            # نمایش دیالوگ
+            dialog = DuplicateWarningDialog(self, result)
+            dialog.exec_()
+        else:
+            self.show_status_message(
+                "✅ هیچ رکورد تکراری یافت نشد. می‌توانید ثبت کنید.",
+                "success"
+            )
+
+    # ═══════════════════════════════════════════════
+    # جمع‌آوری وضعیت خانواده
+    # ═══════════════════════════════════════════════
+    def collect_family_status(self):
+        """جمع‌آوری چک‌باکس‌ها و رادیو باتن‌ها"""
+        selected = []
+
+        # چک‌باکس‌ها
+        for flag, cb in self.family_checkboxes.items():
+            if cb.isChecked():
+                selected.append(flag)
+
+        # رادیو
+        for opt, radio in self.econ_radios.items():
+            if radio.isChecked():
+                selected.append(opt)
+                break
+
+        return "|".join(selected)
+
+    def load_family_status(self, family_status_str):
+        """بارگذاری وضعیت خانواده در فرم"""
+        # پاک کردن قبلی
+        for cb in self.family_checkboxes.values():
+            cb.setChecked(False)
+        self.econ_button_group.setExclusive(False)
+        for radio in self.econ_radios.values():
+            radio.setChecked(False)
+        self.econ_button_group.setExclusive(True)
+
+        if not family_status_str:
+            return
+
+        parts = [p.strip() for p in family_status_str.split('|')]
+        for part in parts:
+            if part in self.family_checkboxes:
+                self.family_checkboxes[part].setChecked(True)
+            elif part in self.econ_radios:
+                self.econ_radios[part].setChecked(True)
+
+    # ═══════════════════════════════════════════════
+    # بارگذاری و پاک کردن فرم
+    # ═══════════════════════════════════════════════
     def load_form_data(self, rec):
         self.form_instagram.setText(rec.get('instagram_id', ''))
         self.form_first_name.setText(rec.get('first_name', ''))
@@ -1903,6 +3290,9 @@ class CyberWatchApp(QMainWindow):
         self.form_tarnama.setText(rec.get('tarnama_code', ''))
         self.form_reg_date.setText(rec.get('reg_date', ''))
         self.form_address.setPlainText(rec.get('address', ''))
+
+        # سال به صورت خودکار از تاریخ استخراج میشه
+        self.form_year_display.setText(rec.get('reg_year', ''))
 
         followers = rec.get('followers', 0)
         self.form_followers.setText(
@@ -1915,11 +3305,10 @@ class CyberWatchApp(QMainWindow):
         idx = self.form_subject.findText(subj)
         self.form_subject.setCurrentIndex(idx if idx >= 0 else 0)
 
-        year = rec.get('reg_year', '')
-        if '|' in year:
-            year = year.split('|')[0].strip()
-        idx = self.form_year.findText(year)
-        self.form_year.setCurrentIndex(idx if idx >= 0 else 0)
+        # وضعیت خانواده
+        self.load_family_status(rec.get('family_status', ''))
+
+        self.clear_status_message()
 
     def clear_form(self):
         self.form_instagram.clear()
@@ -1932,67 +3321,136 @@ class CyberWatchApp(QMainWindow):
         self.form_reg_date.clear()
         self.form_address.clear()
         self.form_followers.clear()
+        self.form_year_display.clear()
         self.form_subject.setCurrentIndex(0)
-        self.form_year.setCurrentIndex(0)
+        self.ni_hint.setText("")
 
+        # پاک کردن چک‌باکس‌ها و رادیو
+        for cb in self.family_checkboxes.values():
+            cb.setChecked(False)
+        self.econ_button_group.setExclusive(False)
+        for radio in self.econ_radios.values():
+            radio.setChecked(False)
+        self.econ_button_group.setExclusive(True)
+
+        self.clear_status_message()
+
+    # ═══════════════════════════════════════════════
+    # 🎯 ذخیره فرم (با چک تکراری)
+    # ═══════════════════════════════════════════════
     def save_form(self):
         instagram_id = self.form_instagram.text().strip()
         if not instagram_id:
             QMessageBox.warning(
-                self, "خطا", "⭐ ایدی اینستاگرام الزامی است!"
+                self, "خطا در ثبت",
+                "⭐ ایدی اینستاگرام الزامی است!"
             )
             return
 
         subject = self.form_subject.currentText().strip()
         if not subject:
             QMessageBox.warning(
-                self, "خطا", "📂 موضوع ثبت الزامی است!"
+                self, "خطا در ثبت",
+                "📂 موضوع ثبت الزامی است!"
             )
             return
 
+        # اعتبارسنجی کد ملی اگه وارد شده
+        national_id = self.form_national_id.text().strip()
+        if national_id:
+            if len(national_id) != 10:
+                reply = QMessageBox.question(
+                    self, "کد ملی ناقص",
+                    "کد ملی باید 10 رقم باشد. آیا با این وضعیت ذخیره شود؟",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.No:
+                    return
+
+        first_name = self.form_first_name.text().strip()
+        last_name = self.form_last_name.text().strip()
+
+        # ═══ چک تکراری با اولویت ═══
+        if not self.edit_id:  # فقط برای ثبت جدید
+            check_result = self.db.check_duplicate(
+                national_id=national_id,
+                instagram_id=instagram_id,
+                first_name=first_name,
+                last_name=last_name,
+                exclude_id=self.edit_id
+            )
+
+            if check_result['has_duplicate']:
+                # نمایش دیالوگ هشدار
+                dialog = DuplicateWarningDialog(self, check_result)
+                dialog.exec_()
+
+                if not dialog.result_action:
+                    # کاربر انصراف داد
+                    self.show_status_message(
+                        "❌ ثبت لغو شد. لطفاً اطلاعات را بررسی کنید.",
+                        "error"
+                    )
+                    return
+                # کاربر تأیید کرد که شخص جدیده، ادامه ثبت
+
+        # جمع‌آوری داده‌ها
         followers_text = self.form_followers.text().strip()
         try:
             followers = int(followers_text) if followers_text else 0
         except Exception:
             followers = 0
 
+        reg_date = self.form_reg_date.text().strip()
+        reg_year = self.form_year_display.text().strip()
+
         data = {
             'instagram_id': instagram_id,
-            'first_name': self.form_first_name.text().strip(),
-            'last_name': self.form_last_name.text().strip(),
+            'first_name': first_name,
+            'last_name': last_name,
             'father_name': self.form_father_name.text().strip(),
             'phone': self.form_phone.text().strip(),
-            'national_id': self.form_national_id.text().strip(),
+            'national_id': national_id,
             'subject': subject,
             'tarnama_code': self.form_tarnama.text().strip(),
-            'reg_date': self.form_reg_date.text().strip(),
+            'reg_date': reg_date,
             'address': self.form_address.toPlainText().strip(),
-            'reg_year': self.form_year.currentText().strip(),
+            'reg_year': reg_year,
             'followers': followers,
+            'family_status': self.collect_family_status(),
         }
 
-        if self.edit_id:
-            self.db.update_user(self.edit_id, data)
-            QMessageBox.information(
-                self, "موفق", "✅ اطلاعات با موفقیت ویرایش شد!"
-            )
-            self.edit_id = None
-        else:
-            self.db.add_user(data)
-            QMessageBox.information(
-                self, "موفق", "✅ کاربر جدید با موفقیت ثبت شد!"
-            )
+        try:
+            if self.edit_id:
+                self.db.update_user(self.edit_id, data)
+                QMessageBox.information(
+                    self, "موفق",
+                    "✅ اطلاعات با موفقیت ویرایش شد!"
+                )
+                self.edit_id = None
+            else:
+                self.db.add_user(data)
+                QMessageBox.information(
+                    self, "موفق",
+                    "✅ کاربر جدید با موفقیت ثبت شد!"
+                )
 
-        self.clear_form()
-        self.show_dashboard()
+            self.clear_form()
+            self.refresh_all_completers()
+            self.show_dashboard()
+
+        except Exception as e:
+            QMessageBox.critical(
+                self, "خطا",
+                "❌ خطا در ذخیره:\n" + str(e)
+            )
 
     def cancel_form(self):
         self.clear_form()
         self.edit_id = None
         self.show_dashboard()
-
-    # ═══════════════════════════════════════════════
-    # 🔬 صفحه تحلیل هوشمند
+        # ═══════════════════════════════════════════════
+    # 📊 صفحه تحلیل هوشمند
     # ═══════════════════════════════════════════════
     def create_analytics_page(self):
         page = QWidget()
@@ -2002,32 +3460,25 @@ class CyberWatchApp(QMainWindow):
 
         layout.addWidget(self.create_page_header(
             "📊 تحلیل هوشمند",
-            "تحلیل تخصصی موضوعات، فالوور و مقایسه‌های آماری"
+            "تحلیل تخصصی موضوعات، فالوور، وضعیت اجتماعی و مقایسه‌های آماری"
         ))
 
-        # تب‌های تحلیل
         self.analytics_tabs = QTabWidget()
 
-        # تب ۱: تحلیل یک موضوع
         self.analytics_tabs.addTab(
             self.create_single_analysis_tab(),
             "🎯  تحلیل یک موضوع"
         )
-
-        # تب ۲: مقایسه دو موضوع
         self.analytics_tabs.addTab(
             self.create_compare_analysis_tab(),
             "🔄  مقایسه دو موضوع"
         )
-
-        # تب ۳: نمای کلی
         self.analytics_tabs.addTab(
             self.create_overview_analysis_tab(),
             "📊  نمای کلی همه موضوعات"
         )
 
         layout.addWidget(self.analytics_tabs)
-
         return page
 
     def create_single_analysis_tab(self):
@@ -2036,7 +3487,6 @@ class CyberWatchApp(QMainWindow):
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(15)
 
-        # کارت انتخاب
         select_card = QFrame()
         select_card.setObjectName("card")
         sc_layout = QHBoxLayout(select_card)
@@ -2064,7 +3514,6 @@ class CyberWatchApp(QMainWindow):
 
         layout.addWidget(select_card)
 
-        # ناحیه نتایج
         self.single_result_scroll = QScrollArea()
         self.single_result_scroll.setWidgetResizable(True)
         self.single_result_scroll.setStyleSheet(
@@ -2097,7 +3546,6 @@ class CyberWatchApp(QMainWindow):
 
         analysis = self.db.get_subject_analysis(subject)
 
-        # پاک کردن نتایج قبلی
         while self.single_result_layout.count():
             item = self.single_result_layout.takeAt(0)
             if item.widget():
@@ -2115,7 +3563,6 @@ class CyberWatchApp(QMainWindow):
             self.single_result_layout.addWidget(no_data)
             return
 
-        # عنوان
         color = SUBJECT_COLORS.get(subject, "#60A5FA")
         title = QLabel("📊 تحلیل کامل موضوع: " + subject)
         title.setStyleSheet(
@@ -2175,7 +3622,7 @@ class CyberWatchApp(QMainWindow):
         stats_widget.setLayout(stats_row)
         self.single_result_layout.addWidget(stats_widget)
 
-        # کارت دسته‌بندی فالوور
+        # دسته‌بندی فالوور
         cat_card = QFrame()
         cat_card.setObjectName("card")
         cat_layout = QVBoxLayout(cat_card)
@@ -2228,9 +3675,7 @@ class CyberWatchApp(QMainWindow):
             row.addWidget(bar, 3)
 
             pct = int((cnt / total_cat) * 100) if total_cat else 0
-            info = QLabel(
-                str(cnt) + " نفر  (" + str(pct) + "%)"
-            )
+            info = QLabel(str(cnt) + " نفر  (" + str(pct) + "%)")
             info.setStyleSheet(
                 "color: " + c + "; font-weight: 900; "
                 "font-size: 13px; padding: 3px 10px;"
@@ -2242,7 +3687,66 @@ class CyberWatchApp(QMainWindow):
 
         self.single_result_layout.addWidget(cat_card)
 
-        # کارت Top 10
+        # وضعیت اجتماعی-اقتصادی
+        if analysis.get('family_stats'):
+            fs_card = QFrame()
+            fs_card.setObjectName("card")
+            fs_layout = QVBoxLayout(fs_card)
+            fs_layout.setContentsMargins(15, 15, 15, 15)
+            fs_layout.setSpacing(8)
+
+            fs_title = QLabel("🏠 وضعیت اجتماعی-اقتصادی این گروه")
+            fs_title.setStyleSheet(
+                "font-size: 15px; font-weight: 700; "
+                "color: #60A5FA; padding: 5px;"
+            )
+            fs_layout.addWidget(fs_title)
+
+            max_fs = max(c for _, c in analysis['family_stats'])
+            total = analysis['total']
+
+            for status, cnt in analysis['family_stats']:
+                row_widget = QWidget()
+                row = QHBoxLayout(row_widget)
+                row.setContentsMargins(8, 3, 8, 3)
+                row.setSpacing(10)
+
+                c = FAMILY_STATUS_COLORS.get(status, "#60A5FA")
+
+                n_lbl = QLabel("● " + status)
+                n_lbl.setStyleSheet(
+                    "font-size: 13px; font-weight: 600; color: " + c + ";"
+                )
+                n_lbl.setMinimumWidth(220)
+                row.addWidget(n_lbl)
+
+                bar = QProgressBar()
+                bar.setMaximum(max_fs)
+                bar.setValue(cnt)
+                bar.setTextVisible(False)
+                bar.setStyleSheet(
+                    "QProgressBar { background-color: #334155; "
+                    "border: none; border-radius: 6px; height: 12px; } "
+                    "QProgressBar::chunk { background-color: " + c +
+                    "; border-radius: 6px; }"
+                )
+                bar.setFixedHeight(12)
+                row.addWidget(bar, 3)
+
+                pct = int((cnt / total) * 100)
+                info = QLabel(str(cnt) + " (" + str(pct) + "%)")
+                info.setStyleSheet(
+                    "color: " + c + "; font-weight: 900; "
+                    "font-size: 13px; padding: 3px 10px;"
+                )
+                info.setMinimumWidth(100)
+                row.addWidget(info)
+
+                fs_layout.addWidget(row_widget)
+
+            self.single_result_layout.addWidget(fs_card)
+
+        # Top 10
         if analysis['top_users']:
             top_card = QFrame()
             top_card.setObjectName("card")
@@ -2250,9 +3754,7 @@ class CyberWatchApp(QMainWindow):
             top_layout.setContentsMargins(15, 15, 15, 15)
             top_layout.setSpacing(8)
 
-            top_title = QLabel(
-                "🏆 Top 10 کاربران با بیشترین دنبال‌کننده"
-            )
+            top_title = QLabel("🏆 Top 10 کاربران با بیشترین دنبال‌کننده")
             top_title.setStyleSheet(
                 "font-size: 15px; font-weight: 700; "
                 "color: #60A5FA; padding: 5px;"
@@ -2302,7 +3804,7 @@ class CyberWatchApp(QMainWindow):
 
             self.single_result_layout.addWidget(top_card)
 
-        # کارت توزیع سالانه
+        # توزیع سالانه
         if analysis['year_distribution']:
             year_card = QFrame()
             year_card.setObjectName("card")
@@ -2346,9 +3848,7 @@ class CyberWatchApp(QMainWindow):
                 row.addWidget(bar, 3)
 
                 pct = int((cnt / analysis['total']) * 100)
-                info = QLabel(
-                    "{:,}".format(cnt) + "  (" + str(pct) + "%)"
-                )
+                info = QLabel("{:,}".format(cnt) + "  (" + str(pct) + "%)")
                 info.setStyleSheet(
                     "color: #60A5FA; font-weight: 900; "
                     "font-size: 13px; padding: 3px 10px;"
@@ -2360,7 +3860,7 @@ class CyberWatchApp(QMainWindow):
 
             self.single_result_layout.addWidget(year_card)
 
-        # کارت موضوعات مرتبط
+        # موضوعات مرتبط
         if analysis['related_subjects']:
             rel_card = QFrame()
             rel_card.setObjectName("card")
@@ -2368,9 +3868,7 @@ class CyberWatchApp(QMainWindow):
             rel_layout.setContentsMargins(15, 15, 15, 15)
             rel_layout.setSpacing(8)
 
-            r_title = QLabel(
-                "🔗 موضوعات مرتبط (کاربران چند موضوعه)"
-            )
+            r_title = QLabel("🔗 موضوعات مرتبط (کاربران چند موضوعه)")
             r_title.setStyleSheet(
                 "font-size: 15px; font-weight: 700; "
                 "color: #60A5FA; padding: 5px;"
@@ -2385,9 +3883,7 @@ class CyberWatchApp(QMainWindow):
 
                 c = SUBJECT_COLORS.get(related_subj, "#60A5FA")
 
-                badge = QLabel(
-                    subject + "  +  " + related_subj
-                )
+                badge = QLabel(subject + "  +  " + related_subj)
                 badge.setStyleSheet(
                     "font-size: 13px; font-weight: 600; color: #F1F5F9;"
                 )
@@ -2407,7 +3903,7 @@ class CyberWatchApp(QMainWindow):
 
             self.single_result_layout.addWidget(rel_card)
 
-        # کارت کیفیت اطلاعات
+        # کیفیت اطلاعات
         q_card = QFrame()
         q_card.setObjectName("card")
         q_layout = QVBoxLayout(q_card)
@@ -2429,6 +3925,8 @@ class CyberWatchApp(QMainWindow):
             ("🆔 دارای شماره ملی", quality['has_national_id'], "#3B82F6"),
             ("🏠 دارای نشانی", quality['has_address'], "#F59E0B"),
             ("👥 دارای فالوور", quality['has_followers'], "#EAB308"),
+            ("🏠 دارای وضعیت خانواده",
+             quality.get('has_family_status', 0), "#EC4899"),
         ]
 
         for name, cnt, c in q_data:
@@ -2441,7 +3939,7 @@ class CyberWatchApp(QMainWindow):
             n_lbl.setStyleSheet(
                 "font-size: 13px; font-weight: 600; color: #F1F5F9;"
             )
-            n_lbl.setMinimumWidth(180)
+            n_lbl.setMinimumWidth(200)
             row.addWidget(n_lbl)
 
             bar = QProgressBar()
@@ -2458,9 +3956,7 @@ class CyberWatchApp(QMainWindow):
             row.addWidget(bar, 3)
 
             pct = int((cnt / total) * 100) if total else 0
-            info = QLabel(
-                str(cnt) + " (" + str(pct) + "%)"
-            )
+            info = QLabel(str(cnt) + " (" + str(pct) + "%)")
             info.setStyleSheet(
                 "color: " + c + "; font-weight: 900; "
                 "font-size: 13px; padding: 3px 10px;"
@@ -2471,10 +3967,10 @@ class CyberWatchApp(QMainWindow):
             q_layout.addWidget(row_widget)
 
         self.single_result_layout.addWidget(q_card)
-
         self.single_result_layout.addStretch()
+
     # ═══════════════════════════════════════════════
-    # تب ۲: مقایسه دو موضوع
+    # تب مقایسه دو موضوع
     # ═══════════════════════════════════════════════
     def create_compare_analysis_tab(self):
         tab = QWidget()
@@ -2482,7 +3978,6 @@ class CyberWatchApp(QMainWindow):
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(15)
 
-        # کارت انتخاب
         select_card = QFrame()
         select_card.setObjectName("card")
         sc_layout = QGridLayout(select_card)
@@ -2526,7 +4021,6 @@ class CyberWatchApp(QMainWindow):
 
         layout.addWidget(select_card)
 
-        # ناحیه نتایج
         self.compare_result_scroll = QScrollArea()
         self.compare_result_scroll.setWidgetResizable(True)
         self.compare_result_scroll.setStyleSheet(
@@ -2560,23 +4054,19 @@ class CyberWatchApp(QMainWindow):
 
         if s1 == s2:
             QMessageBox.warning(
-                self, "توجه",
-                "دو موضوع متفاوت انتخاب کنید"
+                self, "توجه", "دو موضوع متفاوت انتخاب کنید"
             )
             return
 
         result = self.db.compare_two_subjects(s1, s2)
 
-        # پاک کردن قبلی
         while self.compare_result_layout.count():
             item = self.compare_result_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
         if not result:
-            no_data = QLabel(
-                "❌ داده‌ای برای مقایسه یافت نشد"
-            )
+            no_data = QLabel("❌ داده‌ای برای مقایسه یافت نشد")
             no_data.setStyleSheet(
                 "color: #EF4444; font-size: 15px; padding: 40px;"
             )
@@ -2587,7 +4077,6 @@ class CyberWatchApp(QMainWindow):
         a1 = result['subject1']
         a2 = result['subject2']
 
-        # عنوان
         c1 = SUBJECT_COLORS.get(s1, "#60A5FA")
         c2 = SUBJECT_COLORS.get(s2, "#F59E0B")
 
@@ -2600,7 +4089,6 @@ class CyberWatchApp(QMainWindow):
         title.setAlignment(Qt.AlignCenter)
         self.compare_result_layout.addWidget(title)
 
-        # جدول مقایسه
         comp_card = QFrame()
         comp_card.setObjectName("card")
         comp_layout = QVBoxLayout(comp_card)
@@ -2649,7 +4137,6 @@ class CyberWatchApp(QMainWindow):
         header_widget.setLayout(header)
         comp_layout.addWidget(header_widget)
 
-        # ردیف‌های مقایسه
         rows_data = [
             ("👥 تعداد کاربران",
              "{:,}".format(a1['total']),
@@ -2792,7 +4279,7 @@ class CyberWatchApp(QMainWindow):
         self.compare_result_layout.addStretch()
 
     # ═══════════════════════════════════════════════
-    # تب ۳: نمای کلی همه موضوعات
+    # تب نمای کلی
     # ═══════════════════════════════════════════════
     def create_overview_analysis_tab(self):
         tab = QWidget()
@@ -2805,9 +4292,7 @@ class CyberWatchApp(QMainWindow):
         hc_layout = QHBoxLayout(header_card)
         hc_layout.setContentsMargins(15, 12, 15, 12)
 
-        info = QLabel(
-            "📊 مقایسه آماری همه موضوعات با یکدیگر"
-        )
+        info = QLabel("📊 مقایسه آماری همه موضوعات با یکدیگر")
         info.setStyleSheet(
             "font-size: 14px; font-weight: 700; color: #60A5FA;"
         )
@@ -2822,7 +4307,6 @@ class CyberWatchApp(QMainWindow):
 
         layout.addWidget(header_card)
 
-        # ناحیه نتایج
         self.overview_scroll = QScrollArea()
         self.overview_scroll.setWidgetResizable(True)
         self.overview_scroll.setStyleSheet(
@@ -2875,126 +4359,7 @@ class CyberWatchApp(QMainWindow):
         title.setAlignment(Qt.AlignCenter)
         self.overview_layout.addWidget(title)
 
-        # جدول رتبه‌بندی
-        table_card = QFrame()
-        table_card.setObjectName("card")
-        table_layout = QVBoxLayout(table_card)
-        table_layout.setContentsMargins(15, 15, 15, 15)
-        table_layout.setSpacing(0)
-
-        # هدر
-        header = QHBoxLayout()
-        header.setSpacing(8)
-
-        headers = [
-            ("#", 50),
-            ("موضوع", 200),
-            ("تعداد", 100),
-            ("مجموع فالوور", 130),
-            ("میانگین", 110),
-            ("حداکثر", 110),
-            ("با فالوور", 100),
-        ]
-
-        for h_text, w in headers:
-            h_lbl = QLabel(h_text)
-            h_lbl.setStyleSheet(
-                "font-size: 13px; font-weight: 700; color: #60A5FA; "
-                "padding: 10px 5px; background-color: #334155; "
-                "border-radius: 4px;"
-            )
-            h_lbl.setAlignment(Qt.AlignCenter)
-            h_lbl.setMinimumWidth(w)
-            header.addWidget(h_lbl)
-
-        header_w = QWidget()
-        header_w.setLayout(header)
-        table_layout.addWidget(header_w)
-
-        # ردیف‌ها
-        for i, item in enumerate(results, 1):
-            row_widget = QWidget()
-            row = QHBoxLayout(row_widget)
-            row.setContentsMargins(0, 0, 0, 0)
-            row.setSpacing(8)
-
-            bg = "#1E293B" if i % 2 == 0 else "#0F172A"
-            c = SUBJECT_COLORS.get(item['subject'], "#60A5FA")
-
-            # رتبه
-            rank_lbl = QLabel(str(i))
-            rank_lbl.setStyleSheet(
-                "font-size: 14px; font-weight: 900; color: #F59E0B; "
-                "background-color: " + bg + "; padding: 10px 5px;"
-            )
-            rank_lbl.setAlignment(Qt.AlignCenter)
-            rank_lbl.setMinimumWidth(50)
-            row.addWidget(rank_lbl)
-
-            # موضوع
-            subj_lbl = QLabel("● " + item['subject'])
-            subj_lbl.setStyleSheet(
-                "font-size: 13px; font-weight: 700; color: " + c + "; "
-                "background-color: " + bg + "; padding: 10px 5px;"
-            )
-            subj_lbl.setMinimumWidth(200)
-            row.addWidget(subj_lbl)
-
-            # تعداد
-            cnt_lbl = QLabel("{:,}".format(item['total']))
-            cnt_lbl.setStyleSheet(
-                "font-size: 13px; font-weight: 700; color: #F1F5F9; "
-                "background-color: " + bg + "; padding: 10px 5px;"
-            )
-            cnt_lbl.setAlignment(Qt.AlignCenter)
-            cnt_lbl.setMinimumWidth(100)
-            row.addWidget(cnt_lbl)
-
-            # مجموع فالوور
-            tf_lbl = QLabel(format_followers(item['total_followers']))
-            tf_lbl.setStyleSheet(
-                "font-size: 13px; font-weight: 700; color: #10B981; "
-                "background-color: " + bg + "; padding: 10px 5px;"
-            )
-            tf_lbl.setAlignment(Qt.AlignCenter)
-            tf_lbl.setMinimumWidth(130)
-            row.addWidget(tf_lbl)
-
-            # میانگین
-            avg_lbl = QLabel(format_followers(item['avg_followers']))
-            avg_lbl.setStyleSheet(
-                "font-size: 13px; font-weight: 700; color: #F59E0B; "
-                "background-color: " + bg + "; padding: 10px 5px;"
-            )
-            avg_lbl.setAlignment(Qt.AlignCenter)
-            avg_lbl.setMinimumWidth(110)
-            row.addWidget(avg_lbl)
-
-            # حداکثر
-            max_lbl = QLabel(format_followers(item['max_followers']))
-            max_lbl.setStyleSheet(
-                "font-size: 13px; font-weight: 700; color: #EF4444; "
-                "background-color: " + bg + "; padding: 10px 5px;"
-            )
-            max_lbl.setAlignment(Qt.AlignCenter)
-            max_lbl.setMinimumWidth(110)
-            row.addWidget(max_lbl)
-
-            # با فالوور
-            wf_lbl = QLabel("{:,}".format(item['count_with_followers']))
-            wf_lbl.setStyleSheet(
-                "font-size: 13px; font-weight: 700; color: #A855F7; "
-                "background-color: " + bg + "; padding: 10px 5px;"
-            )
-            wf_lbl.setAlignment(Qt.AlignCenter)
-            wf_lbl.setMinimumWidth(100)
-            row.addWidget(wf_lbl)
-
-            table_layout.addWidget(row_widget)
-
-        self.overview_layout.addWidget(table_card)
-
-        # نمودار نسبتی
+        # نمودار توزیع
         chart_card = QFrame()
         chart_card.setObjectName("card")
         chart_layout = QVBoxLayout(chart_card)
@@ -3022,7 +4387,7 @@ class CyberWatchApp(QMainWindow):
             n_lbl.setStyleSheet(
                 "font-size: 13px; font-weight: 600; color: " + c + ";"
             )
-            n_lbl.setMinimumWidth(200)
+            n_lbl.setMinimumWidth(220)
             row.addWidget(n_lbl)
 
             bar = QProgressBar()
@@ -3038,12 +4403,14 @@ class CyberWatchApp(QMainWindow):
             bar.setFixedHeight(14)
             row.addWidget(bar, 3)
 
-            info = QLabel("{:,}".format(item['total']))
+            info_txt = "{:,}".format(item['total']) + \
+                       " | " + format_followers(item['total_followers'])
+            info = QLabel(info_txt)
             info.setStyleSheet(
                 "color: " + c + "; font-weight: 900; "
                 "font-size: 13px; padding: 3px 10px;"
             )
-            info.setMinimumWidth(80)
+            info.setMinimumWidth(150)
             info.setAlignment(Qt.AlignCenter)
             row.addWidget(info)
 
@@ -3053,7 +4420,7 @@ class CyberWatchApp(QMainWindow):
         self.overview_layout.addStretch()
 
     # ═══════════════════════════════════════════════
-    # صفحه لیست همه رکوردها
+    # صفحه لیست
     # ═══════════════════════════════════════════════
     def create_list_page(self):
         page = QWidget()
@@ -3140,7 +4507,7 @@ class CyberWatchApp(QMainWindow):
 
         tabs = QTabWidget()
 
-        # تب ۱: بارگذاری مجدد
+        # تب بارگذاری مجدد
         reload_tab = QWidget()
         reload_layout = QVBoxLayout(reload_tab)
         reload_layout.setContentsMargins(20, 20, 20, 20)
@@ -3167,7 +4534,7 @@ class CyberWatchApp(QMainWindow):
         reload_layout.addStretch()
         tabs.addTab(reload_tab, "📂  بارگذاری مجدد")
 
-        # تب ۲: بک‌آپ
+        # تب بک‌آپ
         backup_tab = QWidget()
         backup_layout = QVBoxLayout(backup_tab)
         backup_layout.setContentsMargins(20, 20, 20, 20)
@@ -3212,7 +4579,7 @@ class CyberWatchApp(QMainWindow):
 
         tabs.addTab(backup_tab, "💾  بک‌آپ")
 
-        # تب ۳: درباره
+        # تب درباره
         about_tab = QWidget()
         about_layout = QVBoxLayout(about_tab)
         about_layout.setContentsMargins(20, 20, 20, 20)
@@ -3233,28 +4600,27 @@ class CyberWatchApp(QMainWindow):
             "<h1 style='color: #60A5FA;'>🛡️ " + APP_NAME + "</h1>"
             "<p style='font-size:15px;'><b>نسخه " + APP_VERSION + "</b></p>"
             "<hr style='border-color:#334155;'>"
-            "<h3 style='color:#10B981;'>✨ ویژگی‌ها:</h3>"
+            "<h3 style='color:#10B981;'>✨ ویژگی‌های نسخه 10.0:</h3>"
             "<ul style='font-size:13px;'>"
-            "<li>✅ جستجوی هوشمند در تمام فیلدها</li>"
-            "<li>✅ جستجوی پیشرفته با فیلترهای همزمان</li>"
-            "<li>✅ ثبت و مدیریت تعداد دنبال‌کننده</li>"
+            "<li>✅ تشخیص هوشمند رکوردهای تکراری</li>"
+            "<li>✅ تکمیل هوشمند نام‌ها از دیتابیس</li>"
+            "<li>✅ تقویم شمسی داخلی</li>"
+            "<li>✅ اعتبارسنجی کد ملی</li>"
+            "<li>✅ استخراج خودکار سال از تاریخ</li>"
+            "<li>✅ Validator های تخصصی برای هر فیلد</li>"
+            "<li>✅ وضعیت اجتماعی-اقتصادی</li>"
             "<li>✅ تحلیل هوشمند موضوعات</li>"
-            "<li>✅ مقایسه دو موضوع به صورت آماری</li>"
-            "<li>✅ نمای کلی و رتبه‌بندی همه موضوعات</li>"
-            "<li>✅ بک‌آپ خودکار دیتابیس</li>"
-            "<li>✅ خروجی اکسل حرفه‌ای</li>"
+            "<li>✅ بک‌آپ خودکار</li>"
             "</ul>"
             "<hr style='border-color:#334155;'>"
-            "<h3 style='color:#F59E0B;'>📂 موضوعات قابل انتخاب:</h3>"
+            "<h3 style='color:#F59E0B;'>📂 موضوعات:</h3>"
             "<div style='padding: 8px;'>" + subjects_html + "</div>"
             "<hr style='border-color:#334155;'>"
-            "<h3 style='color:#A855F7;'>👥 دسته‌بندی فالوور:</h3>"
+            "<h3 style='color:#EC4899;'>🏠 وضعیت‌های اجتماعی-اقتصادی:</h3>"
             "<ul style='font-size:13px;'>"
-            "<li>🔴 <b>مگا</b>: بیش از 1 میلیون</li>"
-            "<li>🟠 <b>ماکرو</b>: 100 هزار تا 1 میلیون</li>"
-            "<li>🟡 <b>میدل</b>: 10 هزار تا 100 هزار</li>"
-            "<li>🟢 <b>میکرو</b>: 1 هزار تا 10 هزار</li>"
-            "<li>⚪ <b>نانو</b>: کمتر از 1 هزار</li>"
+            "<li><b>فرزند طلاق</b>، <b>بدسرپرست</b>، "
+            "<b>طلاق</b>، <b>فوت همسر</b></li>"
+            "<li>وضعیت اقتصادی: <b>ضعیف / متوسط / مناسب</b></li>"
             "</ul>"
             "<hr style='border-color:#334155;'>"
             "<p style='color:#94A3B8;'><b>مسیر دیتابیس:</b><br>"
@@ -3290,9 +4656,7 @@ class CyberWatchApp(QMainWindow):
                 )
                 self.refresh_backup_list()
             else:
-                QMessageBox.warning(
-                    self, "خطا", "نتوانستم بک‌آپ بگیرم"
-                )
+                QMessageBox.warning(self, "خطا", "نتوانستم بک‌آپ بگیرم")
         except Exception as e:
             QMessageBox.critical(self, "خطا", str(e))
 
@@ -3375,19 +4739,19 @@ class CyberWatchApp(QMainWindow):
                 self, "موفق",
                 "✅ {:,} رکورد با موفقیت بارگذاری شد!".format(total)
             )
+            self.refresh_all_completers()
             self.show_dashboard()
 
         except Exception as e:
             loading.close()
             loading.deleteLater()
-
             QMessageBox.critical(
                 self, "خطا",
                 "❌ خطا در بارگذاری:\n" + str(e)
             )
 
     # ═══════════════════════════════════════════════
-    # ناوبری بین صفحات
+    # ناوبری
     # ═══════════════════════════════════════════════
     def show_dashboard(self):
         self.set_active_nav(0)
@@ -3405,6 +4769,7 @@ class CyberWatchApp(QMainWindow):
     def show_form(self):
         self.set_active_nav(3)
         self.stack.setCurrentIndex(3)
+        self.setup_form_completers()
 
     def show_list(self):
         self.set_active_nav(4)
@@ -3429,7 +4794,6 @@ def main():
     app.setApplicationName(APP_NAME)
     app.setStyleSheet(STYLE)
 
-    # مرحله ۱: Splash Screen
     splash = SplashScreen()
     splash.show()
     QApplication.processEvents()
@@ -3444,19 +4808,16 @@ def main():
         splash.update_progress(value, status)
         time.sleep(0.3)
 
-    # مرحله ۲: بستن Splash
     splash.close()
     splash.deleteLater()
     QApplication.processEvents()
 
-    # مرحله ۳: Setup اولیه اگر لازم بود
     db = Database()
     if not db.is_ready():
         setup_done = show_setup_dialog_standalone(app, db)
         if not setup_done:
             sys.exit(0)
 
-    # مرحله ۴: پنجره اصلی
     window = CyberWatchApp(db)
     window.show()
     window.raise_()
