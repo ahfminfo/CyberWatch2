@@ -1,4 +1,4 @@
-name: Build سامانه نظارت v11.0 - Setup Installer
+name: Build سامانه نظارت v11.1 - Merge Feature
 
 on:
   push:
@@ -45,7 +45,7 @@ jobs:
         pip install PyQt5==5.15.10 pandas openpyxl pyinstaller Pillow
     
     # ═══════════════════════════════════════════════
-    # مرحله ۵: نصب Inno Setup (با Chocolatey)
+    # مرحله ۵: نصب Inno Setup
     # ═══════════════════════════════════════════════
     - name: Install Inno Setup via Chocolatey
       run: |
@@ -54,13 +54,10 @@ jobs:
         
         Write-Host "✅ Inno Setup installed"
         
-        # چک نصب
         $innoPath = "C:\Program Files (x86)\Inno Setup 6"
         if (Test-Path "$innoPath\ISCC.exe") {
           Write-Host "✅ ISCC.exe found at: $innoPath\ISCC.exe"
-          & "$innoPath\ISCC.exe" /? | Select-Object -First 3
         } else {
-          # مسیر جایگزین
           $possiblePaths = @(
             "C:\Program Files\Inno Setup 6\ISCC.exe",
             "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
@@ -77,9 +74,7 @@ jobs:
           }
           
           if (-not $found) {
-            Write-Host "❌ ISCC.exe not found in any location!"
-            Write-Host "Searching for ISCC.exe..."
-            Get-ChildItem -Path "C:\Program Files*" -Filter "ISCC.exe" -Recurse -ErrorAction SilentlyContinue
+            Write-Host "❌ ISCC.exe not found!"
             exit 1
           }
         }
@@ -101,7 +96,6 @@ jobs:
             img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
             draw = ImageDraw.Draw(img)
             
-            # دایره پس‌زمینه آبی
             margin = size // 16
             draw.ellipse(
                 [margin, margin, size - margin, size - margin],
@@ -110,7 +104,6 @@ jobs:
                 width=max(1, size // 32)
             )
             
-            # سپر سفید
             shield_margin = size // 4
             shield_top = shield_margin
             shield_bottom = size - shield_margin
@@ -128,7 +121,6 @@ jobs:
             
             draw.polygon(shield_points, fill=(255, 255, 255, 240))
             
-            # علامت تیک آبی
             check_size = size // 4
             check_x = shield_mid_x - check_size // 2
             check_y = size // 2 - check_size // 4
@@ -225,17 +217,24 @@ jobs:
       run: |
         $readme = @"
         ================================================
-        Samaneh Nezarat v11.0
+        Samaneh Nezarat v11.1
+        Dataset Merge Feature Added
         ================================================
         
         Installation:
-        1. Run SamanehNezarat-Setup-v11.0.exe
+        1. Run SamanehNezarat-Setup-v11.1.exe
         2. Follow the installation wizard
         3. Desktop icon will be created
         
         First Run:
         - You must load an Excel database file
         - Without dataset, the app won't run
+        
+        New in v11.1:
+        - Dataset Merge Feature
+        - Update existing records without losing data
+        - Add new users automatically
+        - Cumulative fields for subjects and dates
         
         Data Location:
         C:\ProgramData\SamanehNezarat\
@@ -252,7 +251,6 @@ jobs:
       run: |
         Write-Host "🔨 Building Setup Installer..."
         
-        # پیدا کردن ISCC
         $isccPath = ""
         $possiblePaths = @(
           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
@@ -291,7 +289,7 @@ jobs:
     # ═══════════════════════════════════════════════
     - name: Verify Setup file
       run: |
-        $setupFile = "SamanehNezarat-Setup-v11.0.exe"
+        $setupFile = "SamanehNezarat-Setup-v11.1.exe"
         
         if (Test-Path $setupFile) {
           $setup = Get-Item $setupFile
@@ -309,8 +307,8 @@ jobs:
     - name: Upload Setup Installer
       uses: actions/upload-artifact@v4
       with:
-        name: SamanehNezarat-Setup-v11.0
-        path: SamanehNezarat-Setup-v11.0.exe
+        name: SamanehNezarat-Setup-v11.1
+        path: SamanehNezarat-Setup-v11.1.exe
         retention-days: 90
         compression-level: 0
     
@@ -320,18 +318,18 @@ jobs:
     - name: Create Portable ZIP
       run: |
         Compress-Archive -Path "dist/SamanehNezarat/*" `
-          -DestinationPath "SamanehNezarat-Portable-v11.0.zip" `
+          -DestinationPath "SamanehNezarat-Portable-v11.1.zip" `
           -CompressionLevel Optimal
         
-        $zip = Get-Item "SamanehNezarat-Portable-v11.0.zip"
+        $zip = Get-Item "SamanehNezarat-Portable-v11.1.zip"
         $zipMB = [math]::Round($zip.Length / 1MB, 2)
         Write-Host "✅ Portable ZIP: $zipMB MB"
     
     - name: Upload Portable ZIP
       uses: actions/upload-artifact@v4
       with:
-        name: SamanehNezarat-Portable-v11.0
-        path: SamanehNezarat-Portable-v11.0.zip
+        name: SamanehNezarat-Portable-v11.1
+        path: SamanehNezarat-Portable-v11.1.zip
         retention-days: 30
         compression-level: 0
     
@@ -342,8 +340,10 @@ jobs:
       run: |
         Write-Host ""
         Write-Host "════════════════════════════════════════"
-        Write-Host "  🎉 Build Complete! v11.0"
+        Write-Host "  🎉 Build Complete! v11.1"
         Write-Host "════════════════════════════════════════"
+        Write-Host "  🆕 New Feature: Dataset Merge"
+        Write-Host ""
         Write-Host "  📦 Downloads:"
         Write-Host "  1. Setup Installer (Recommended)"
         Write-Host "  2. Portable ZIP"
