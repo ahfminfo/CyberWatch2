@@ -4934,7 +4934,7 @@ class CyberWatchApp(QMainWindow):
             )
 
         def show_merge_report(self, stats, old_total, new_total):
-        """نمایش گزارش کامل ادغام"""
+        """Show merge report"""
         dialog = QDialog(self)
         dialog.setWindowTitle("گزارش کامل ادغام")
         dialog.setLayoutDirection(Qt.RightToLeft)
