@@ -45,30 +45,43 @@ jobs:
         pip install PyQt5==5.15.10 pandas openpyxl pyinstaller Pillow
     
     # ═══════════════════════════════════════════════
-    # مرحله ۵: نصب Inno Setup
+    # مرحله ۵: نصب Inno Setup (با Chocolatey)
     # ═══════════════════════════════════════════════
-    - name: Install Inno Setup
+    - name: Install Inno Setup via Chocolatey
       run: |
-        Write-Host "📦 Downloading Inno Setup..."
-        $url = "https://files.jrsoftware.org/is/6/innosetup-6.2.2.exe"
-        $output = "$env:TEMP\innosetup.exe"
-        Invoke-WebRequest -Uri $url -OutFile $output
-        
-        Write-Host "🔧 Installing Inno Setup..."
-        Start-Process -FilePath $output -Args "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-" -Wait
+        Write-Host "📦 Installing Inno Setup via Chocolatey..."
+        choco install innosetup -y --no-progress
         
         Write-Host "✅ Inno Setup installed"
         
-        # اضافه کردن به PATH
-        $innoPath = "C:\Program Files (x86)\Inno Setup 6"
-        echo $innoPath | Out-File -FilePath $env:GITHUB_PATH -Append
-        
         # چک نصب
+        $innoPath = "C:\Program Files (x86)\Inno Setup 6"
         if (Test-Path "$innoPath\ISCC.exe") {
           Write-Host "✅ ISCC.exe found at: $innoPath\ISCC.exe"
+          & "$innoPath\ISCC.exe" /? | Select-Object -First 3
         } else {
-          Write-Host "❌ ISCC.exe not found!"
-          exit 1
+          # مسیر جایگزین
+          $possiblePaths = @(
+            "C:\Program Files\Inno Setup 6\ISCC.exe",
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
+          )
+          
+          $found = $false
+          foreach ($path in $possiblePaths) {
+            if (Test-Path $path) {
+              Write-Host "✅ Found at: $path"
+              $found = $true
+              break
+            }
+          }
+          
+          if (-not $found) {
+            Write-Host "❌ ISCC.exe not found in any location!"
+            Write-Host "Searching for ISCC.exe..."
+            Get-ChildItem -Path "C:\Program Files*" -Filter "ISCC.exe" -Recurse -ErrorAction SilentlyContinue
+            exit 1
+          }
         }
     
     # ═══════════════════════════════════════════════
@@ -81,25 +94,23 @@ jobs:
         $iconScript = @'
         from PIL import Image, ImageDraw
         
-        # ابعاد مختلف برای ICO
         sizes = [16, 32, 48, 64, 128, 256]
         images = []
         
         for size in sizes:
-            # ایجاد تصویر با پس‌زمینه شفاف
             img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
             draw = ImageDraw.Draw(img)
             
-            # رسم دایره پس‌زمینه (آبی تیره)
+            # دایره پس‌زمینه آبی
             margin = size // 16
             draw.ellipse(
                 [margin, margin, size - margin, size - margin],
-                fill=(37, 99, 235, 255),  # آبی
+                fill=(37, 99, 235, 255),
                 outline=(96, 165, 250, 255),
                 width=max(1, size // 32)
             )
             
-            # رسم سپر داخل دایره (سفید)
+            # سپر سفید
             shield_margin = size // 4
             shield_top = shield_margin
             shield_bottom = size - shield_margin
@@ -107,7 +118,6 @@ jobs:
             shield_right = size - shield_margin - size // 12
             shield_mid_x = size // 2
             
-            # نقاط سپر
             shield_points = [
                 (shield_left, shield_top + size // 12),
                 (shield_right, shield_top + size // 12),
@@ -118,7 +128,7 @@ jobs:
             
             draw.polygon(shield_points, fill=(255, 255, 255, 240))
             
-            # رسم علامت تیک داخل سپر
+            # علامت تیک آبی
             check_size = size // 4
             check_x = shield_mid_x - check_size // 2
             check_y = size // 2 - check_size // 4
@@ -138,7 +148,6 @@ jobs:
             
             images.append(img)
         
-        # ذخیره ICO با چند سایز
         images[0].save(
             'icon.ico',
             format='ICO',
@@ -146,8 +155,7 @@ jobs:
             append_images=images[1:]
         )
         
-        print("✅ Icon created successfully")
-        print(f"📦 Size: {sum(1 for s in sizes)} resolutions")
+        print("Icon created successfully")
         '@
         
         $iconScript | Out-File -FilePath "create_icon.py" -Encoding UTF8
@@ -155,7 +163,7 @@ jobs:
         
         if (Test-Path "icon.ico") {
           $iconSize = (Get-Item "icon.ico").Length / 1KB
-          Write-Host "✅ Icon file: icon.ico ($([math]::Round($iconSize, 2)) KB)"
+          Write-Host "✅ Icon: $([math]::Round($iconSize, 2)) KB"
         } else {
           Write-Host "❌ Icon creation failed"
           exit 1
@@ -168,15 +176,9 @@ jobs:
       run: |
         Write-Host "📁 Repository files:"
         Get-ChildItem -Path . -File | Format-Table Name, Length
-        Write-Host ""
-        Write-Host "🐍 Python version:"
-        python --version
-        Write-Host ""
-        Write-Host "📦 Installed packages:"
-        pip list | Select-String -Pattern "PyQt5|pandas|openpyxl|pyinstaller|Pillow"
     
     # ═══════════════════════════════════════════════
-    # مرحله ۸: Build EXE با PyInstaller
+    # مرحله ۸: Build EXE
     # ═══════════════════════════════════════════════
     - name: Build EXE with PyInstaller
       run: |
@@ -204,28 +206,15 @@ jobs:
     # ═══════════════════════════════════════════════
     # مرحله ۹: تأیید Build
     # ═══════════════════════════════════════════════
-    - name: Verify build
+    - name: Verify EXE build
       run: |
         if (Test-Path "dist/SamanehNezarat/SamanehNezarat.exe") {
-          Write-Host "════════════════════════════════════════"
-          Write-Host "  ✅ EXE Build successful!"
-          Write-Host "════════════════════════════════════════"
-          
+          Write-Host "✅ EXE Build successful!"
           $exe = Get-Item "dist/SamanehNezarat/SamanehNezarat.exe"
           $sizeMB = [math]::Round($exe.Length / 1MB, 2)
           Write-Host "📦 EXE Size: $sizeMB MB"
-          
-          $totalSize = (Get-ChildItem "dist/SamanehNezarat" -Recurse | 
-                        Measure-Object -Property Length -Sum).Sum
-          $totalMB = [math]::Round($totalSize / 1MB, 2)
-          Write-Host "📦 Total Folder Size: $totalMB MB"
-          
-          $fileCount = (Get-ChildItem "dist/SamanehNezarat" -Recurse -File).Count
-          Write-Host "📁 Total Files: $fileCount"
-          Write-Host "════════════════════════════════════════"
         } else {
           Write-Host "❌ EXE Build failed!"
-          Get-ChildItem "dist" -Recurse | Format-Table Name, Length
           exit 1
         }
     
@@ -236,67 +225,20 @@ jobs:
       run: |
         $readme = @"
         ================================================
-        سامانه کاربران تحت نظارت در فضای مجازی
-        نسخه 11.0 - Enterprise Edition
+        Samaneh Nezarat v11.0
         ================================================
         
-        این نسخه شامل نصب‌کننده حرفه‌ای است.
+        Installation:
+        1. Run SamanehNezarat-Setup-v11.0.exe
+        2. Follow the installation wizard
+        3. Desktop icon will be created
         
-        نحوه نصب:
-        --------
-        1. فایل SamanehNezarat-Setup-v11.0.exe را اجرا کنید
-        2. مراحل نصب را دنبال کنید
-        3. آیکون روی دسکتاپ ایجاد می‌شود
-        4. برنامه از Start Menu نیز قابل دسترسی است
+        First Run:
+        - You must load an Excel database file
+        - Without dataset, the app won't run
         
-        در اولین اجرا:
-        -------------
-        - سامانه از شما فایل اکسل دیتابیس می‌خواهد
-        - این کار الزامی است و بدون آن برنامه اجرا نمی‌شود
-        - فایل اکسل باید شامل ستون‌های زیر باشد:
-          * ایدی اینستاگرام (الزامی)
-          * نام
-          * نام خانوادگی
-          * نام پدر
-          * شماره تماس
-          * شماره ملی
-          * موضوع
-          * تعداد دنبال‌کننده
-          * تاریخ ثبت
-          * نشانی
-          * کد تارنما
-        
-        ویژگی‌های نسخه 11.0:
-        --------------------
-        - نصب‌کننده حرفه‌ای (Setup.exe)
-        - آیکون روی دسکتاپ و Start Menu
-        - Uninstaller خودکار
-        - سوال درباره حفظ/حذف داده‌های قبلی
-        - تفکیک هوشمند سال‌های ترکیبی در آمار
-        - تشخیص هوشمند رکوردهای تکراری
-        - تکمیل هوشمند خودکار نام‌ها
-        - تقویم شمسی داخلی
-        - اعتبارسنجی کد ملی ایرانی
-        - Validator های تخصصی
-        - وضعیت اجتماعی-اقتصادی
-        - تحلیل هوشمند موضوعات
-        - بک‌آپ خودکار دیتابیس
-        - خروجی اکسل حرفه‌ای
-        
-        مسیر ذخیره اطلاعات:
-        -------------------
+        Data Location:
         C:\ProgramData\SamanehNezarat\
-        (این مسیر مخفی است. برای دسترسی:
-         Start → Run → type: %ProgramData%\SamanehNezarat)
-        
-        بک‌آپ‌ها:
-        --------
-        C:\ProgramData\SamanehNezarat\backups\
-        
-        Uninstall:
-        ----------
-        از Control Panel > Programs یا Start Menu
-        هنگام Uninstall، از شما درباره حذف داده‌ها پرسیده می‌شود
         
         ================================================
         "@
@@ -304,27 +246,37 @@ jobs:
         Write-Host "✅ README created"
     
     # ═══════════════════════════════════════════════
-    # مرحله ۱۱: Build Setup Installer
+    # مرحله ۱۱: Build Setup
     # ═══════════════════════════════════════════════
     - name: Build Setup Installer with Inno Setup
       run: |
         Write-Host "🔨 Building Setup Installer..."
-        Write-Host "════════════════════════════════════════"
         
-        $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+        # پیدا کردن ISCC
+        $isccPath = ""
+        $possiblePaths = @(
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+          "C:\Program Files\Inno Setup 6\ISCC.exe"
+        )
         
-        if (-not (Test-Path $isccPath)) {
+        foreach ($path in $possiblePaths) {
+          if (Test-Path $path) {
+            $isccPath = $path
+            break
+          }
+        }
+        
+        if ($isccPath -eq "") {
           Write-Host "❌ ISCC.exe not found!"
           exit 1
         }
         
+        Write-Host "Using: $isccPath"
+        
         & $isccPath "installer.iss"
         
         if ($LASTEXITCODE -eq 0) {
-          Write-Host "════════════════════════════════════════"
-          Write-Host "  ✅ Setup Installer created!"
-          Write-Host "════════════════════════════════════════"
-          
+          Write-Host "✅ Setup Installer created!"
           Get-ChildItem -Path "." -Filter "*.exe" | ForEach-Object {
             $sizeMB = [math]::Round($_.Length / 1MB, 2)
             Write-Host "📦 $($_.Name): $sizeMB MB"
@@ -344,14 +296,7 @@ jobs:
         if (Test-Path $setupFile) {
           $setup = Get-Item $setupFile
           $sizeMB = [math]::Round($setup.Length / 1MB, 2)
-          
-          Write-Host "════════════════════════════════════════"
-          Write-Host "  ✅ Setup file ready!"
-          Write-Host "════════════════════════════════════════"
-          Write-Host "  📦 File: $setupFile"
-          Write-Host "  💾 Size: $sizeMB MB"
-          Write-Host "  📅 Created: $($setup.CreationTime)"
-          Write-Host "════════════════════════════════════════"
+          Write-Host "✅ Setup ready: $setupFile ($sizeMB MB)"
         } else {
           Write-Host "❌ Setup file not found!"
           Get-ChildItem -Path . -Filter "*.exe" | Format-Table
@@ -370,18 +315,17 @@ jobs:
         compression-level: 0
     
     # ═══════════════════════════════════════════════
-    # مرحله ۱۴: آپلود Portable (اختیاری)
+    # مرحله ۱۴: Portable ZIP
     # ═══════════════════════════════════════════════
     - name: Create Portable ZIP
       run: |
-        Write-Host "📦 Creating portable ZIP..."
         Compress-Archive -Path "dist/SamanehNezarat/*" `
           -DestinationPath "SamanehNezarat-Portable-v11.0.zip" `
           -CompressionLevel Optimal
         
         $zip = Get-Item "SamanehNezarat-Portable-v11.0.zip"
         $zipMB = [math]::Round($zip.Length / 1MB, 2)
-        Write-Host "✅ Portable ZIP Size: $zipMB MB"
+        Write-Host "✅ Portable ZIP: $zipMB MB"
     
     - name: Upload Portable ZIP
       uses: actions/upload-artifact@v4
@@ -392,7 +336,7 @@ jobs:
         compression-level: 0
     
     # ═══════════════════════════════════════════════
-    # مرحله ۱۵: خلاصه نهایی
+    # مرحله ۱۵: خلاصه
     # ═══════════════════════════════════════════════
     - name: Build Summary
       run: |
@@ -400,28 +344,9 @@ jobs:
         Write-Host "════════════════════════════════════════"
         Write-Host "  🎉 Build Complete! v11.0"
         Write-Host "════════════════════════════════════════"
+        Write-Host "  📦 Downloads:"
+        Write-Host "  1. Setup Installer (Recommended)"
+        Write-Host "  2. Portable ZIP"
         Write-Host ""
-        Write-Host "  📦 Available Downloads:"
-        Write-Host ""
-        Write-Host "  1️⃣ SamanehNezarat-Setup-v11.0 (Installer)"
-        Write-Host "     ✅ Professional installer"
-        Write-Host "     ✅ Desktop shortcut"
-        Write-Host "     ✅ Start Menu entry"
-        Write-Host "     ✅ Uninstaller included"
-        Write-Host "     ✅ Recommended for end users"
-        Write-Host ""
-        Write-Host "  2️⃣ SamanehNezarat-Portable-v11.0 (ZIP)"
-        Write-Host "     ✅ No installation needed"
-        Write-Host "     ✅ Run from any folder"
-        Write-Host "     ✅ For testing purposes"
-        Write-Host ""
-        Write-Host "  🎯 New Features in v11.0:"
-        Write-Host "     • Setup.exe installer"
-        Write-Host "     • Desktop & Start Menu icons"
-        Write-Host "     • Mandatory dataset upload"
-        Write-Host "     • Year splitting (combined years)"
-        Write-Host "     • Data preservation dialog"
-        Write-Host ""
-        Write-Host "  ⬇️ Download from:"
-        Write-Host "     Actions > This workflow > Artifacts"
+        Write-Host "  ⬇️ Actions > Artifacts"
         Write-Host "════════════════════════════════════════"
