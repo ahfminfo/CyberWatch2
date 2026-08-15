@@ -4932,11 +4932,10 @@ class CyberWatchApp(QMainWindow):
                 self, "خطا",
                 "❌ خطا در ادغام:\n" + str(e)
             )
-
-        def show_merge_report(self, stats, old_total, new_total):
+    def show_merge_report(self, stats, old_total, new_total):
         """Show merge report"""
         dialog = QDialog(self)
-        dialog.setWindowTitle("گزارش کامل ادغام")
+        dialog.setWindowTitle("Merge Report")
         dialog.setLayoutDirection(Qt.RightToLeft)
         dialog.setMinimumSize(550, 620)
         dialog.setStyleSheet("QDialog { background-color: #0F172A; }")
@@ -4945,7 +4944,7 @@ class CyberWatchApp(QMainWindow):
         layout.setContentsMargins(25, 25, 25, 25)
         layout.setSpacing(12)
 
-        # ═══ هدر موفقیت ═══
+        # Header
         success_frame = QFrame()
         success_frame.setStyleSheet(
             "background-color: #10B981; border-radius: 12px; padding: 15px;"
@@ -4969,31 +4968,26 @@ class CyberWatchApp(QMainWindow):
 
         layout.addWidget(success_frame)
 
-        # ═══ عنوان بخش گزارش عملیات ═══
+        # Section 1
         section1_title = QLabel("📊 گزارش عملیات ادغام")
         section1_title.setStyleSheet(
-            "color: #60A5FA; font-size: 15px; font-weight: 700; "
-            "padding: 8px 0;"
+            "color: #60A5FA; font-size: 15px; font-weight: 700; padding: 8px 0;"
         )
         layout.addWidget(section1_title)
 
-        # ═══ کارت‌های آمار عملیات ═══
-        # کارت ۱: کل رکوردهای فایل
         card1 = self._create_report_card(
             "📄", "{:,}".format(stats['total_rows']),
             "کل رکوردهای فایل اکسل", "#60A5FA"
         )
         layout.addWidget(card1)
 
-        # کارت ۲: رکوردهای معتبر
         valid_rows = stats.get('valid_rows', stats['total_rows'] - stats['skipped'])
         card2 = self._create_report_card(
             "✅", "{:,}".format(valid_rows),
-            "رکوردهای معتبر (قابل پردازش)", "#10B981"
+            "رکوردهای معتبر", "#10B981"
         )
         layout.addWidget(card2)
 
-        # کارت ۳: رد شده
         if stats['skipped'] > 0:
             card3 = self._create_report_card(
                 "⚠️", "{:,}".format(stats['skipped']),
@@ -5001,51 +4995,46 @@ class CyberWatchApp(QMainWindow):
             )
             layout.addWidget(card3)
 
-        # جداکننده
+        # Separator
         sep1 = QFrame()
         sep1.setFrameShape(QFrame.HLine)
         sep1.setStyleSheet("background-color: #334155;")
         sep1.setMaximumHeight(2)
         layout.addWidget(sep1)
 
-        # ═══ عنوان بخش تفصیل ═══
+        # Section 2
         section2_title = QLabel("🔍 جزئیات پردازش")
         section2_title.setStyleSheet(
-            "color: #60A5FA; font-size: 15px; font-weight: 700; "
-            "padding: 8px 0;"
+            "color: #60A5FA; font-size: 15px; font-weight: 700; padding: 8px 0;"
         )
         layout.addWidget(section2_title)
 
-        # کارت ۴: کاربران جدید
         card4 = self._create_report_card(
             "🆕", "{:,}".format(stats['new_users']),
             "کاربران جدید (اضافه شد)", "#3B82F6"
         )
         layout.addWidget(card4)
 
-        # کارت ۵: بروزرسانی شد
         card5 = self._create_report_card(
             "🔄", "{:,}".format(stats['updated_users']),
             "کاربران بروزرسانی شد", "#8B5CF6"
         )
         layout.addWidget(card5)
 
-        # جداکننده
+        # Separator
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.HLine)
         sep2.setStyleSheet("background-color: #334155;")
         sep2.setMaximumHeight(2)
         layout.addWidget(sep2)
 
-        # ═══ آمار کلی سامانه ═══
-        section3_title = QLabel("📈 آمار کلی سامانه (بروزرسانی شده)")
+        # Section 3
+        section3_title = QLabel("📈 آمار کلی سامانه")
         section3_title.setStyleSheet(
-            "color: #60A5FA; font-size: 15px; font-weight: 700; "
-            "padding: 8px 0;"
+            "color: #60A5FA; font-size: 15px; font-weight: 700; padding: 8px 0;"
         )
         layout.addWidget(section3_title)
 
-        # کارت آمار کلی
         total_frame = QFrame()
         total_frame.setStyleSheet(
             "background-color: #1E3A8A; border-radius: 12px; padding: 15px;"
@@ -5053,7 +5042,6 @@ class CyberWatchApp(QMainWindow):
         tl = QVBoxLayout(total_frame)
         tl.setSpacing(10)
 
-        # قبل از ادغام
         row1 = QHBoxLayout()
         row1_lbl = QLabel("📊 قبل از ادغام:")
         row1_lbl.setStyleSheet(
@@ -5061,8 +5049,7 @@ class CyberWatchApp(QMainWindow):
             "background-color: transparent;"
         )
         row1.addWidget(row1_lbl)
-
-        row1_val = QLabel("{:,}".format(old_total) + " رکورد")
+        row1_val = QLabel("{:,} رکورد".format(old_total))
         row1_val.setStyleSheet(
             "color: white; font-size: 16px; font-weight: 900; "
             "background-color: transparent;"
@@ -5070,7 +5057,6 @@ class CyberWatchApp(QMainWindow):
         row1.addWidget(row1_val, 1, Qt.AlignLeft)
         tl.addLayout(row1)
 
-        # بعد از ادغام
         row2 = QHBoxLayout()
         row2_lbl = QLabel("📈 بعد از ادغام:")
         row2_lbl.setStyleSheet(
@@ -5078,8 +5064,7 @@ class CyberWatchApp(QMainWindow):
             "background-color: transparent;"
         )
         row2.addWidget(row2_lbl)
-
-        row2_val = QLabel("{:,}".format(new_total) + " رکورد")
+        row2_val = QLabel("{:,} رکورد".format(new_total))
         row2_val.setStyleSheet(
             "color: #10B981; font-size: 16px; font-weight: 900; "
             "background-color: transparent;"
@@ -5087,7 +5072,6 @@ class CyberWatchApp(QMainWindow):
         row2.addWidget(row2_val, 1, Qt.AlignLeft)
         tl.addLayout(row2)
 
-        # افزایش خالص
         increase = new_total - old_total
         row3 = QHBoxLayout()
         row3_lbl = QLabel("✨ افزایش خالص:")
@@ -5098,13 +5082,13 @@ class CyberWatchApp(QMainWindow):
         row3.addWidget(row3_lbl)
 
         if increase > 0:
-            row3_text = "+{:,}".format(increase) + " رکورد"
+            row3_text = "+{:,} رکورد".format(increase)
             row3_color = "#FCD34D"
         elif increase == 0:
-            row3_text = "بدون تغییر (فقط بروزرسانی)"
+            row3_text = "بدون تغییر"
             row3_color = "#94A3B8"
         else:
-            row3_text = "{:,}".format(increase) + " رکورد"
+            row3_text = "{:,} رکورد".format(increase)
             row3_color = "#EF4444"
 
         row3_val = QLabel(row3_text)
@@ -5117,21 +5101,19 @@ class CyberWatchApp(QMainWindow):
 
         layout.addWidget(total_frame)
 
-        # ═══ پیام راهنما (اگه رد شده وجود داشت) ═══
+        # Hint
         if stats['skipped'] > 0:
             hint = QLabel(
-                "💡 نکته: رکوردهایی که هم کد ملی و هم ایدی اینستاگرام "
-                "خالی داشتند، رد شدند."
+                "💡 نکته: رکوردهایی که هم کد ملی و هم ایدی خالی داشتند رد شدند."
             )
             hint.setStyleSheet(
-                "color: #F59E0B; font-size: 11px; font-style: italic; "
-                "padding: 10px; background-color: #78350F; "
-                "border-radius: 8px;"
+                "color: #F59E0B; font-size: 11px; padding: 10px; "
+                "background-color: #78350F; border-radius: 8px;"
             )
             hint.setWordWrap(True)
             layout.addWidget(hint)
 
-        # ═══ دکمه تأیید ═══
+        # Button
         ok_btn = QPushButton("✅ تأیید و بستن")
         ok_btn.setObjectName("successButton")
         ok_btn.setMinimumHeight(46)
@@ -5140,6 +5122,43 @@ class CyberWatchApp(QMainWindow):
         layout.addWidget(ok_btn)
 
         dialog.exec_()
+
+    def _create_report_card(self, icon, value, label, color):
+        """Create report card"""
+        card = QFrame()
+        card.setStyleSheet(
+            "background-color: #1E293B; border: 1px solid #334155; "
+            "border-radius: 10px; padding: 10px;"
+        )
+        cl = QHBoxLayout(card)
+        cl.setContentsMargins(15, 8, 15, 8)
+        cl.setSpacing(15)
+
+        icon_lbl = QLabel(icon)
+        icon_lbl.setStyleSheet(
+            "font-size: 28px; background-color: transparent;"
+        )
+        icon_lbl.setMinimumWidth(45)
+        cl.addWidget(icon_lbl)
+
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(2)
+
+        label_lbl = QLabel(label)
+        label_lbl.setStyleSheet(
+            "color: #94A3B8; font-size: 12px; font-weight: 600;"
+        )
+        info_layout.addWidget(label_lbl)
+
+        value_lbl = QLabel(value)
+        value_lbl.setStyleSheet(
+            "font-size: 20px; font-weight: 900; color: " + color + ";"
+        )
+        info_layout.addWidget(value_lbl)
+
+        cl.addLayout(info_layout, 1)
+
+        return card
 
     def _create_report_card(self, icon, value, label, color):
         """ساخت کارت آماری برای گزارش"""
