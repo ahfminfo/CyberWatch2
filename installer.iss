@@ -2,7 +2,7 @@
 ; Version 11.0
 
 #define MyAppName "Samaneh Nezarat"
-#define MyAppVersion "11.0"
+#define MyAppVersion "11.1"
 #define MyAppPublisher "AHFMInfo"
 #define MyAppExeName "SamanehNezarat.exe"
 
