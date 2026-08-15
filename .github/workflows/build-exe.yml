@@ -1,4 +1,4 @@
-name: Build سامانه نظارت Desktop
+name: Build سامانه نظارت v10.0
 
 on:
   push:
@@ -22,8 +22,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        key: ${{ runner.os }}-pip-v10-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
+          ${{ runner.os }}-pip-v10-
           ${{ runner.os }}-pip-
     
     - name: Install dependencies
@@ -33,8 +34,14 @@ jobs:
     
     - name: Show file structure
       run: |
-        Write-Host "📁 Files in repository:"
+        Write-Host "📁 Repository files:"
         Get-ChildItem -Path . -File | Format-Table Name, Length
+        Write-Host ""
+        Write-Host "🐍 Python version:"
+        python --version
+        Write-Host ""
+        Write-Host "📦 Installed packages:"
+        pip list | Select-String -Pattern "PyQt5|pandas|openpyxl|pyinstaller"
     
     - name: Build EXE with PyInstaller
       run: |
@@ -49,13 +56,19 @@ jobs:
           --hidden-import openpyxl `
           --hidden-import sqlite3 `
           --hidden-import numpy `
+          --hidden-import re `
+          --hidden-import shutil `
+          --hidden-import datetime `
           --noconfirm `
           main.py
     
     - name: Verify build
       run: |
         if (Test-Path "dist/SamanehNezarat/SamanehNezarat.exe") {
-          Write-Host "✅ Build successful!"
+          Write-Host "════════════════════════════════════════"
+          Write-Host "  ✅ Build successful!"
+          Write-Host "════════════════════════════════════════"
+          
           $exe = Get-Item "dist/SamanehNezarat/SamanehNezarat.exe"
           $sizeMB = [math]::Round($exe.Length / 1MB, 2)
           Write-Host "📦 EXE Size: $sizeMB MB"
@@ -67,19 +80,21 @@ jobs:
           
           $fileCount = (Get-ChildItem "dist/SamanehNezarat" -Recurse -File).Count
           Write-Host "📁 Total Files: $fileCount"
+          Write-Host "════════════════════════════════════════"
         } else {
           Write-Host "❌ Build failed! EXE not found"
-          Get-ChildItem "dist" -Recurse | Format-Table Name
+          Write-Host "Files in dist:"
+          Get-ChildItem "dist" -Recurse | Format-Table Name, Length
           exit 1
         }
     
     - name: Create README for users
       run: |
         $readme = @"
-        =====================================
+        ================================================
         سامانه کاربران تحت نظارت در فضای مجازی
-        نسخه 9.0
-        =====================================
+        نسخه 10.0 Enterprise Edition
+        ================================================
         
         نحوه اجرا:
         ----------
@@ -87,20 +102,41 @@ jobs:
         2. در اولین اجرا، فایل اکسل دیتابیس را انتخاب کنید
         3. برنامه آماده استفاده است
         
-        امکانات:
-        --------
-        - جستجوی هوشمند
-        - جستجوی پیشرفته
-        - ثبت کاربر جدید (با فیلد فالوور)
-        - تحلیل هوشمند (یک موضوع، مقایسه، نمای کلی)
-        - بک‌آپ خودکار
-        - خروجی اکسل
+        ویژگی‌های نسخه 10.0:
+        --------------------
+        - تشخیص هوشمند رکوردهای تکراری (کد ملی، ایدی، نام)
+        - تکمیل هوشمند خودکار نام‌ها
+        - تقویم شمسی داخلی
+        - اعتبارسنجی کد ملی ایرانی
+        - Validator های تخصصی برای هر فیلد
+        - وضعیت اجتماعی-اقتصادی
+        - تحلیل هوشمند موضوعات (تک، مقایسه، کلی)
+        - نمای مقایسه‌ای دو موضوع
+        - بک‌آپ خودکار دیتابیس
+        - خروجی اکسل حرفه‌ای
+        - Auto-Complete در فرم‌ها
+        - استخراج خودکار سال از تاریخ
+        
+        محدودیت‌های ورودی:
+        ------------------
+        - کد ملی: فقط 10 رقم عددی
+        - شماره تماس: 11 رقم شروع با 0
+        - نام/نام خانوادگی/نام پدر: فقط حروف فارسی
+        - ایدی اینستاگرام: حروف، عدد، نقطه، آندرلاین
+        - کد تارنما: عدد، حرف، / و \\
+        - تعداد فالوور: فقط عدد
+        - تاریخ: فرمت 1403/05/15
         
         مسیر ذخیره اطلاعات:
-        ------------------
+        -------------------
         C:\Users\<UserName>\CyberWatchData\
         
-        =====================================
+        بک‌آپ‌ها:
+        --------
+        C:\Users\<UserName>\CyberWatchData\backups\
+        (5 بک‌آپ آخر نگه داشته می‌شود)
+        
+        ================================================
         "@
         $readme | Out-File -FilePath "dist/SamanehNezarat/README.txt" -Encoding UTF8
         Write-Host "✅ README created"
@@ -109,18 +145,18 @@ jobs:
       run: |
         Write-Host "📦 Compressing files..."
         Compress-Archive -Path "dist/SamanehNezarat/*" `
-          -DestinationPath "SamanehNezarat-v9.0.zip" `
+          -DestinationPath "SamanehNezarat-v10.0.zip" `
           -CompressionLevel Optimal
         
-        $zip = Get-Item "SamanehNezarat-v9.0.zip"
+        $zip = Get-Item "SamanehNezarat-v10.0.zip"
         $zipMB = [math]::Round($zip.Length / 1MB, 2)
         Write-Host "✅ ZIP Size: $zipMB MB"
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: SamanehNezarat-v9.0
-        path: SamanehNezarat-v9.0.zip
+        name: SamanehNezarat-v10.0
+        path: SamanehNezarat-v10.0.zip
         retention-days: 30
         compression-level: 0
     
@@ -129,8 +165,17 @@ jobs:
         Write-Host ""
         Write-Host "════════════════════════════════════════"
         Write-Host "  ✅ Build Complete!"
+        Write-Host "  🎯 Version: 10.0 Enterprise"
         Write-Host "════════════════════════════════════════"
-        Write-Host "  📦 File: SamanehNezarat-v9.0.zip"
+        Write-Host "  📦 File: SamanehNezarat-v10.0.zip"
         Write-Host "  📅 Retention: 30 days"
         Write-Host "  ⬇️  Download from Actions > Artifacts"
+        Write-Host "════════════════════════════════════════"
+        Write-Host ""
+        Write-Host "  ✨ New Features:"
+        Write-Host "    • Duplicate detection"
+        Write-Host "    • Auto-complete"
+        Write-Host "    • Persian calendar"
+        Write-Host "    • Family status tracking"
+        Write-Host "    • Enterprise validators"
         Write-Host "════════════════════════════════════════"
